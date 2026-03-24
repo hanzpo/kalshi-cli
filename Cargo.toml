@@ -4,3 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+dirs = "6"
+rsa = "0.9"
+sha2 = "0.10"
+base64 = "0.22"
+anyhow = "1"
+thiserror = "2"
+comfy-table = "7"
+chrono = { version = "0.4", features = ["serde"] }
+url = "2"
+rand = "0.8"
