@@ -132,6 +132,7 @@ pub enum MarketCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        /// Browse all markets interactively, one page at a time
         #[arg(long)]
         all: bool,
         #[arg(long)]

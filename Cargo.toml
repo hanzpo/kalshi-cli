@@ -20,4 +20,4 @@ comfy-table = "7"
 chrono = { version = "0.4", features = ["serde"] }
 url = "2"
 rand = "0.8"
-terminal_size = "0.4.4"
+crossterm = "0.29"

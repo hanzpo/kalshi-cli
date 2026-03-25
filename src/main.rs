@@ -1,4 +1,5 @@
 mod auth;
+mod browse;
 mod cli;
 mod client;
 mod commands;
