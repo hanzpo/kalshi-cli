@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+use crate::browse;
 use crate::cli::MarketCmd;
 use crate::client::KalshiClient;
 use crate::models::market::{
@@ -7,6 +8,39 @@ use crate::models::market::{
 };
 use crate::output::{OutputFormat, output, output_one, print_json};
 use crate::pagination::{PaginationOpts, auto_paginate};
+
+/// Build the query params shared by the paginated fetcher.
+fn build_market_query(
+    page_limit: u32,
+    page_cursor: Option<String>,
+    status: &Option<String>,
+    series_ticker: &Option<String>,
+    event_ticker: &Option<String>,
+) -> Vec<(String, String)> {
+    let mut query = vec![("limit".to_string(), page_limit.to_string())];
+    if let Some(c) = page_cursor {
+        query.push(("cursor".to_string(), c));
+    }
+    if let Some(s) = status {
+        query.push(("status".to_string(), s.clone()));
+    }
+    if let Some(s) = series_ticker {
+        query.push(("series_ticker".to_string(), s.clone()));
+    }
+    if let Some(e) = event_ticker {
+        query.push(("event_ticker".to_string(), e.clone()));
+    }
+    query
+}
+
+async fn fetch_markets_page(
+    client: &KalshiClient,
+    query: &[(String, String)],
+) -> Result<(Vec<crate::models::market::Market>, Option<String>)> {
+    let query_refs: Vec<(&str, &str)> = query.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+    let resp: MarketsResponse = client.get("/markets", &query_refs).await?;
+    Ok((resp.markets.unwrap_or_default(), resp.cursor))
+}
 
 pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputFormat) -> Result<()> {
     match cmd {
@@ -18,33 +52,49 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputForma
             series_ticker,
             event_ticker,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let markets = auto_paginate(&opts, 100, |page_limit, page_cursor| {
-                let status = status.clone();
-                let series_ticker = series_ticker.clone();
-                let event_ticker = event_ticker.clone();
-                async move {
-                    let mut query = vec![("limit", page_limit.to_string())];
-                    if let Some(c) = page_cursor {
-                        query.push(("cursor", c));
+            if all {
+                // Interactive paginated browser — fetches one page at a time.
+                let page_size: u32 = limit.unwrap_or(50);
+                let initial_cursor = cursor;
+                browse::browse(page_size, |page_limit, page_cursor| {
+                    let status = status.clone();
+                    let series_ticker = series_ticker.clone();
+                    let event_ticker = event_ticker.clone();
+                    let initial_cursor = initial_cursor.clone();
+                    async move {
+                        // On the very first call page_cursor is None; use --cursor if provided.
+                        let effective_cursor = page_cursor.or(initial_cursor);
+                        let query = build_market_query(
+                            page_limit,
+                            effective_cursor,
+                            &status,
+                            &series_ticker,
+                            &event_ticker,
+                        );
+                        fetch_markets_page(client, &query).await
                     }
-                    if let Some(ref s) = status {
-                        query.push(("status", s.clone()));
+                })
+                .await?;
+            } else {
+                let opts = PaginationOpts { limit, cursor, all };
+                let markets = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+                    let status = status.clone();
+                    let series_ticker = series_ticker.clone();
+                    let event_ticker = event_ticker.clone();
+                    async move {
+                        let query = build_market_query(
+                            page_limit,
+                            page_cursor,
+                            &status,
+                            &series_ticker,
+                            &event_ticker,
+                        );
+                        fetch_markets_page(client, &query).await
                     }
-                    if let Some(ref s) = series_ticker {
-                        query.push(("series_ticker", s.clone()));
-                    }
-                    if let Some(ref e) = event_ticker {
-                        query.push(("event_ticker", e.clone()));
-                    }
-                    let query_refs: Vec<(&str, &str)> =
-                        query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: MarketsResponse = client.get("/markets", &query_refs).await?;
-                    Ok((resp.markets.unwrap_or_default(), resp.cursor))
-                }
-            })
-            .await?;
-            output(&markets, format)?;
+                })
+                .await?;
+                output(&markets, format)?;
+            }
         }
         MarketCmd::Get { ticker } => {
             let path = format!("/markets/{}", ticker);
