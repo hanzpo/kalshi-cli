@@ -70,8 +70,9 @@ impl TableDisplay for Market {
             self.title
                 .as_ref()
                 .map(|t| {
-                    if t.len() > 50 {
-                        format!("{}...", &t[..47])
+                    if t.chars().count() > 50 {
+                        let truncated: String = t.chars().take(47).collect();
+                        format!("{truncated}...")
                     } else {
                         t.clone()
                     }
