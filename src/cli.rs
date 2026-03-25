@@ -23,6 +23,10 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub verbose: bool,
 
+    /// Disable automatic paging of long output
+    #[arg(long, global = true)]
+    pub no_pager: bool,
+
     #[command(subcommand)]
     pub command: Command,
 }
@@ -180,6 +184,15 @@ pub enum MarketCmd {
         #[arg(long)]
         depth: Option<u32>,
     },
+    /// Search markets by keyword (client-side filter)
+    Search {
+        /// Search query (matched against title and ticker)
+        query: String,
+        #[arg(long)]
+        limit: Option<u32>,
+        #[arg(long)]
+        status: Option<String>,
+    },
 }
 
 // ── Event ──
@@ -198,6 +211,9 @@ pub enum EventCmd {
         status: Option<String>,
         #[arg(long)]
         series_ticker: Option<String>,
+        /// Filter by category (e.g. "Elections", "Sports", "Financials")
+        #[arg(long)]
+        category: Option<String>,
         #[arg(long)]
         with_nested_markets: bool,
     },

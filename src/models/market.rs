@@ -8,40 +8,54 @@ pub struct Market {
     pub ticker: Option<String>,
     pub event_ticker: Option<String>,
     pub title: Option<String>,
-    pub status: Option<String>,
-    pub yes_bid: Option<f64>,
-    pub yes_ask: Option<f64>,
-    pub no_bid: Option<f64>,
-    pub no_ask: Option<f64>,
-    pub last_price: Option<f64>,
-    pub volume: Option<i64>,
-    pub volume_24h: Option<i64>,
-    pub open_interest: Option<i64>,
-    pub result: Option<String>,
     pub subtitle: Option<String>,
+    pub status: Option<String>,
+    pub market_type: Option<String>,
+    pub result: Option<String>,
+
+    // Prices — the API returns dollar strings like "0.6500"
+    pub yes_bid_dollars: Option<String>,
+    pub yes_ask_dollars: Option<String>,
+    pub no_bid_dollars: Option<String>,
+    pub no_ask_dollars: Option<String>,
+    pub last_price_dollars: Option<String>,
+    pub previous_price_dollars: Option<String>,
+    pub previous_yes_bid_dollars: Option<String>,
+    pub previous_yes_ask_dollars: Option<String>,
+    pub notional_value_dollars: Option<String>,
+    pub liquidity_dollars: Option<String>,
+
+    // Sizes
+    pub yes_bid_size_fp: Option<String>,
+    pub yes_ask_size_fp: Option<String>,
+
+    // Volume / OI — also dollar strings
+    pub volume_fp: Option<String>,
+    pub volume_24h_fp: Option<String>,
+    pub open_interest_fp: Option<String>,
+
+    // Timing
     pub open_time: Option<String>,
     pub close_time: Option<String>,
+    pub expected_expiration_time: Option<String>,
+    pub expiration_time: Option<String>,
+    pub created_time: Option<String>,
+
+    // Other
     pub yes_sub_title: Option<String>,
     pub no_sub_title: Option<String>,
-    pub market_type: Option<String>,
-    pub response_price_units: Option<String>,
-    pub notional_value: Option<f64>,
-    pub tick_size: Option<f64>,
     pub rules_primary: Option<String>,
     pub rules_secondary: Option<String>,
     pub settlement_timer_seconds: Option<i64>,
-    pub cap_strike: Option<f64>,
-    pub floor_strike: Option<f64>,
-    pub expected_expiration_time: Option<String>,
-    pub expiration_time: Option<String>,
-    pub settlement_value: Option<String>,
-    pub category: Option<String>,
-    pub risk_limit_cents: Option<i64>,
     pub strike_type: Option<String>,
     pub custom_strike: Option<serde_json::Value>,
-    pub functional_strike: Option<String>,
     pub can_close_early: Option<bool>,
-    // catch-all for any fields we haven't explicitly modeled
+    pub response_price_units: Option<String>,
+    pub tick_size: Option<f64>,
+    pub price_level_structure: Option<String>,
+    pub fractional_trading_enabled: Option<bool>,
+    pub is_provisional: Option<bool>,
+
     #[serde(flatten)]
     pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -57,32 +71,45 @@ pub struct MarketResponse {
     pub market: Market,
 }
 
+/// Trim a dollar string like "0.6500" to "0.65", or "0.0000" to "-"
+fn fmt_price(val: &Option<String>) -> String {
+    match val {
+        Some(s) if s == "0.0000" || s.is_empty() => "-".to_string(),
+        Some(s) => {
+            // Parse and re-format to trim trailing zeros
+            s.parse::<f64>()
+                .map(|v| format!("{:.2}", v))
+                .unwrap_or_else(|_| s.clone())
+        }
+        None => "-".to_string(),
+    }
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.len() > max {
+        format!("{}...", &s[..max - 3])
+    } else {
+        s.to_string()
+    }
+}
+
 impl TableDisplay for Market {
     fn headers() -> Vec<&'static str> {
         vec![
-            "Ticker", "Title", "Status", "Yes Bid", "Yes Ask", "Last Price", "Volume", "Open Int",
+            "Ticker", "Title", "Status", "Yes Bid", "Yes Ask", "Last", "Volume", "OI",
         ]
     }
 
     fn row(&self) -> Vec<String> {
         vec![
-            format_opt(&self.ticker),
-            self.title
-                .as_ref()
-                .map(|t| {
-                    if t.len() > 50 {
-                        format!("{}...", &t[..47])
-                    } else {
-                        t.clone()
-                    }
-                })
-                .unwrap_or_else(|| "-".to_string()),
+            truncate(&format_opt(&self.ticker), 40),
+            truncate(&format_opt(&self.title), 45),
             format_opt(&self.status),
-            self.yes_bid.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.yes_ask.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.last_price.map_or("-".into(), |v| format!("{:.2}", v)),
-            format_opt(&self.volume),
-            format_opt(&self.open_interest),
+            fmt_price(&self.yes_bid_dollars),
+            fmt_price(&self.yes_ask_dollars),
+            fmt_price(&self.last_price_dollars),
+            fmt_price(&self.volume_fp),
+            fmt_price(&self.open_interest_fp),
         ]
     }
 }

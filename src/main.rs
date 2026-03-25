@@ -14,6 +14,7 @@ use clap::Parser;
 use cli::{Cli, Command};
 use client::KalshiClient;
 use config::Config;
+use output::OutputConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,44 +30,48 @@ async fn main() -> Result<()> {
     let config = Config::load(cli.config.as_deref())?;
     let demo = cli.demo || config.demo.unwrap_or(false);
     let client = KalshiClient::new(&config, demo)?;
+    let out = OutputConfig {
+        format: cli.output,
+        no_pager: cli.no_pager,
+    };
 
     match cli.command {
         Command::Config { .. } => unreachable!(),
         Command::Exchange { cmd } => {
-            commands::exchange::execute(&client, cmd, &cli.output).await?;
+            commands::exchange::execute(&client, cmd, &out).await?;
         }
         Command::Market { cmd } => {
-            commands::markets::execute(&client, cmd, &cli.output).await?;
+            commands::markets::execute(&client, cmd, &out).await?;
         }
         Command::Event { cmd } => {
-            commands::events::execute(&client, cmd, &cli.output).await?;
+            commands::events::execute(&client, cmd, &out).await?;
         }
         Command::Series { cmd } => {
-            commands::series::execute(&client, cmd, &cli.output).await?;
+            commands::series::execute(&client, cmd, &out).await?;
         }
         Command::Order { cmd } => {
-            commands::orders::execute(&client, cmd, &cli.output).await?;
+            commands::orders::execute(&client, cmd, &out).await?;
         }
         Command::OrderGroup { cmd } => {
-            commands::order_groups::execute(&client, cmd, &cli.output).await?;
+            commands::order_groups::execute(&client, cmd, &out).await?;
         }
         Command::Portfolio { cmd } => {
-            commands::portfolio::execute(&client, cmd, &cli.output).await?;
+            commands::portfolio::execute(&client, cmd, &out).await?;
         }
         Command::Historical { cmd } => {
-            commands::historical::execute(&client, cmd, &cli.output).await?;
+            commands::historical::execute(&client, cmd, &out).await?;
         }
         Command::Subaccount { cmd } => {
-            commands::subaccounts::execute(&client, cmd, &cli.output).await?;
+            commands::subaccounts::execute(&client, cmd, &out).await?;
         }
         Command::ApiKey { cmd } => {
-            commands::api_keys::execute(&client, cmd, &cli.output).await?;
+            commands::api_keys::execute(&client, cmd, &out).await?;
         }
         Command::Rfq { cmd } => {
-            commands::communications::execute_rfq(&client, cmd, &cli.output).await?;
+            commands::communications::execute_rfq(&client, cmd, &out).await?;
         }
         Command::Quote { cmd } => {
-            commands::communications::execute_quote(&client, cmd, &cli.output).await?;
+            commands::communications::execute_quote(&client, cmd, &out).await?;
         }
     }
 

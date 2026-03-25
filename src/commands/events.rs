@@ -3,10 +3,10 @@ use anyhow::Result;
 use crate::cli::EventCmd;
 use crate::client::KalshiClient;
 use crate::models::event::{EventResponse, EventsResponse};
-use crate::output::{OutputFormat, output, output_one, print_json};
+use crate::output::{OutputConfig, output_one, output_paginated, print_json};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
-pub async fn execute(client: &KalshiClient, cmd: EventCmd, format: &OutputFormat) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -> Result<()> {
     match cmd {
         EventCmd::List {
             limit,
@@ -14,12 +14,14 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, format: &OutputFormat
             all,
             status,
             series_ticker,
+            category,
             with_nested_markets,
         } => {
             let opts = PaginationOpts { limit, cursor, all };
-            let events = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let status = status.clone();
                 let series_ticker = series_ticker.clone();
+                let category = category.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
                     if let Some(c) = page_cursor {
@@ -31,6 +33,9 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, format: &OutputFormat
                     if let Some(ref s) = series_ticker {
                         query.push(("series_ticker", s.clone()));
                     }
+                    if let Some(ref c) = category {
+                        query.push(("category", c.clone()));
+                    }
                     if with_nested_markets {
                         query.push(("with_nested_markets", "true".to_string()));
                     }
@@ -41,7 +46,7 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, format: &OutputFormat
                 }
             })
             .await?;
-            output(&events, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         EventCmd::Get {
             event_ticker,
@@ -53,12 +58,12 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, format: &OutputFormat
                 query.push(("with_nested_markets", "true"));
             }
             let resp: EventResponse = client.get(&path, &query).await?;
-            output_one(&resp.event, format)?;
+            output_one(&resp.event, out)?;
         }
         EventCmd::Metadata { event_ticker } => {
             let path = format!("/events/{}/metadata", event_ticker);
             let resp: serde_json::Value = client.get(&path, &[]).await?;
-            print_json(&resp)?;
+            print_json(&resp, out.no_pager)?;
         }
     }
     Ok(())

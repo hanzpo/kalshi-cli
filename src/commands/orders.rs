@@ -7,10 +7,10 @@ use crate::models::order::{
     BatchCreateResponse, CreateOrderRequest, DecreaseOrderRequest, OrderResponse, OrdersResponse,
     QueuePositionsResponse,
 };
-use crate::output::{OutputFormat, output, output_one, print_json};
+use crate::output::{OutputConfig, output, output_one, output_paginated, print_json};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
-pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {
@@ -45,7 +45,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
                 order_group_id,
             };
             let resp: OrderResponse = client.post("/portfolio/orders", &req).await?;
-            output_one(&resp.order, format)?;
+            output_one(&resp.order, out)?;
         }
         OrderCmd::List {
             limit,
@@ -55,7 +55,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
             status,
         } => {
             let opts = PaginationOpts { limit, cursor, all };
-            let orders = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let status = status.clone();
                 async move {
@@ -77,17 +77,17 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
                 }
             })
             .await?;
-            output(&orders, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         OrderCmd::Get { order_id } => {
             let path = format!("/portfolio/orders/{}", order_id);
             let resp: OrderResponse = client.get(&path, &[]).await?;
-            output_one(&resp.order, format)?;
+            output_one(&resp.order, out)?;
         }
         OrderCmd::Cancel { order_id } => {
             let path = format!("/portfolio/orders/{}", order_id);
             let resp: OrderResponse = client.delete(&path).await?;
-            output_one(&resp.order, format)?;
+            output_one(&resp.order, out)?;
         }
         OrderCmd::Amend {
             order_id,
@@ -108,7 +108,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
             };
             let path = format!("/portfolio/orders/{}/amend", order_id);
             let resp: OrderResponse = client.post(&path, &req).await?;
-            output_one(&resp.order, format)?;
+            output_one(&resp.order, out)?;
         }
         OrderCmd::Decrease {
             order_id,
@@ -117,7 +117,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
             let req = DecreaseOrderRequest { reduce_by };
             let path = format!("/portfolio/orders/{}/decrease", order_id);
             let resp: OrderResponse = client.post(&path, &req).await?;
-            output_one(&resp.order, format)?;
+            output_one(&resp.order, out)?;
         }
         OrderCmd::BatchCreate { file } => {
             let contents = std::fs::read_to_string(&file)
@@ -130,7 +130,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
             let req = BatchCreateRequest { orders };
             let resp: BatchCreateResponse =
                 client.post("/portfolio/orders/batched", &req).await?;
-            output(&resp.orders.unwrap_or_default(), format)?;
+            output(&resp.orders.unwrap_or_default(), out)?;
         }
         OrderCmd::BatchCancel { ticker, order_ids } => {
             let req = BatchCancelRequest { ticker, order_ids };
@@ -145,7 +145,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, format: &OutputFormat
             let query = [("ticker", ticker.as_str())];
             let resp: QueuePositionsResponse =
                 client.get("/portfolio/orders/queue_positions", &query).await?;
-            print_json(&resp.queue_positions)?;
+            print_json(&resp.queue_positions, out.no_pager)?;
         }
     }
     Ok(())

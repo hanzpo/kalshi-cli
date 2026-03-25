@@ -6,13 +6,13 @@ use crate::models::portfolio::{
     Balance, BalanceResponse, FillsResponse, PositionsResponse, RestingValueResponse,
     SettlementsResponse,
 };
-use crate::output::{OutputFormat, output, output_one};
+use crate::output::{OutputConfig, output_one, output_paginated};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
 pub async fn execute(
     client: &KalshiClient,
     cmd: PortfolioCmd,
-    format: &OutputFormat,
+    out: &OutputConfig,
 ) -> Result<()> {
     client.require_auth()?;
 
@@ -24,7 +24,7 @@ pub async fn execute(
                 portfolio_value: resp.portfolio_value,
                 payout: resp.payout,
             };
-            output_one(&balance, format)?;
+            output_one(&balance, out)?;
         }
         PortfolioCmd::Positions {
             limit,
@@ -36,7 +36,7 @@ pub async fn execute(
             settlement_status,
         } => {
             let opts = PaginationOpts { limit, cursor, all };
-            let positions = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let event_ticker = event_ticker.clone();
                 let count_filter = count_filter.clone();
@@ -66,7 +66,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&positions, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::Fills {
             limit,
@@ -78,7 +78,7 @@ pub async fn execute(
             max_ts,
         } => {
             let opts = PaginationOpts { limit, cursor, all };
-            let fills = auto_paginate(&opts, 200, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let order_id = order_id.clone();
                 async move {
@@ -106,7 +106,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&fills, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::Settlements {
             limit,
@@ -115,7 +115,7 @@ pub async fn execute(
             ticker,
         } => {
             let opts = PaginationOpts { limit, cursor, all };
-            let settlements = auto_paginate(&opts, 200, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -133,7 +133,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&settlements, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::RestingValue => {
             let resp: RestingValueResponse = client

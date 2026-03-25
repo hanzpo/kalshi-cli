@@ -5,12 +5,12 @@ use crate::client::KalshiClient;
 use crate::models::order_group::{
     CreateOrderGroupRequest, OrderGroupResponse, OrderGroupsResponse, UpdateOrderGroupLimitRequest,
 };
-use crate::output::{OutputFormat, output, output_one, print_json};
+use crate::output::{OutputConfig, output, output_one, print_json};
 
 pub async fn execute(
     client: &KalshiClient,
     cmd: OrderGroupCmd,
-    format: &OutputFormat,
+    out: &OutputConfig,
 ) -> Result<()> {
     client.require_auth()?;
 
@@ -26,7 +26,7 @@ pub async fn execute(
             }
             let resp: OrderGroupsResponse =
                 client.get("/portfolio/order_groups", &query).await?;
-            output(&resp.order_groups.unwrap_or_default(), format)?;
+            output(&resp.order_groups.unwrap_or_default(), out)?;
         }
         OrderGroupCmd::Create { max_loss } => {
             let req = CreateOrderGroupRequest {
@@ -36,16 +36,16 @@ pub async fn execute(
             let resp: OrderGroupResponse =
                 client.post("/portfolio/order_groups/create", &req).await?;
             if let Some(og) = resp.order_group {
-                output_one(&og, format)?;
+                output_one(&og, out)?;
             } else {
-                print_json(&resp)?;
+                print_json(&resp, out.no_pager)?;
             }
         }
         OrderGroupCmd::Get { group_id } => {
             let path = format!("/portfolio/order_groups/{}", group_id);
             let resp: OrderGroupResponse = client.get(&path, &[]).await?;
             if let Some(og) = resp.order_group {
-                output_one(&og, format)?;
+                output_one(&og, out)?;
             } else {
                 println!("Order group not found.");
             }
@@ -53,23 +53,23 @@ pub async fn execute(
         OrderGroupCmd::Delete { group_id } => {
             let path = format!("/portfolio/order_groups/{}", group_id);
             let resp: serde_json::Value = client.delete(&path).await?;
-            print_json(&resp)?;
+            print_json(&resp, out.no_pager)?;
         }
         OrderGroupCmd::Reset { group_id } => {
             let path = format!("/portfolio/order_groups/{}/reset", group_id);
             let resp: serde_json::Value = client.put(&path, &serde_json::json!({})).await?;
-            print_json(&resp)?;
+            print_json(&resp, out.no_pager)?;
         }
         OrderGroupCmd::Trigger { group_id } => {
             let path = format!("/portfolio/order_groups/{}/trigger", group_id);
             let resp: serde_json::Value = client.put(&path, &serde_json::json!({})).await?;
-            print_json(&resp)?;
+            print_json(&resp, out.no_pager)?;
         }
         OrderGroupCmd::UpdateLimit { group_id, max_loss } => {
             let path = format!("/portfolio/order_groups/{}/limit", group_id);
             let req = UpdateOrderGroupLimitRequest { max_loss };
             let resp: serde_json::Value = client.put(&path, &req).await?;
-            print_json(&resp)?;
+            print_json(&resp, out.no_pager)?;
         }
     }
     Ok(())

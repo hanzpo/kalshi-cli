@@ -6,13 +6,13 @@ use crate::models::historical::{CutoffResponse, HistoricalMarketsResponse};
 use crate::models::market::{CandlesticksResponse, TradesResponse};
 use crate::models::order::OrdersResponse;
 use crate::models::portfolio::FillsResponse;
-use crate::output::{OutputFormat, output};
+use crate::output::{OutputConfig, output, output_paginated};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
 pub async fn execute(
     client: &KalshiClient,
     cmd: HistoricalCmd,
-    format: &OutputFormat,
+    out: &OutputConfig,
 ) -> Result<()> {
     match cmd {
         HistoricalCmd::Markets {
@@ -27,7 +27,7 @@ pub async fn execute(
                 cursor,
                 all: false,
             };
-            let markets = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -51,7 +51,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&markets, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         HistoricalCmd::Trades {
             limit,
@@ -65,7 +65,7 @@ pub async fn execute(
                 cursor,
                 all: false,
             };
-            let trades = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -89,7 +89,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&trades, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         HistoricalCmd::Candlesticks {
             ticker,
@@ -98,10 +98,7 @@ pub async fn execute(
             start_ts,
             end_ts,
         } => {
-            let path = format!(
-                "/historical/markets/{}/candlesticks",
-                ticker
-            );
+            let path = format!("/historical/markets/{}/candlesticks", ticker);
             let mut query = Vec::new();
             let series_str = series_ticker;
             let period_str = period.map(|p| p.to_string());
@@ -119,7 +116,7 @@ pub async fn execute(
                 query.push(("end_ts", e.as_str()));
             }
             let resp: CandlesticksResponse = client.get(&path, &query).await?;
-            output(&resp.candlesticks.unwrap_or_default(), format)?;
+            output(&resp.candlesticks.unwrap_or_default(), out)?;
         }
         HistoricalCmd::Cutoff => {
             let resp: CutoffResponse = client.get("/historical/cutoff", &[]).await?;
@@ -139,7 +136,7 @@ pub async fn execute(
                 cursor,
                 all: false,
             };
-            let fills = auto_paginate(&opts, 200, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -157,7 +154,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&fills, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
         HistoricalCmd::Orders {
             limit,
@@ -170,7 +167,7 @@ pub async fn execute(
                 cursor,
                 all: false,
             };
-            let orders = auto_paginate(&opts, 100, |page_limit, page_cursor| {
+            let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -188,7 +185,7 @@ pub async fn execute(
                 }
             })
             .await?;
-            output(&orders, format)?;
+            output_paginated(&result.items, result.has_more, out)?;
         }
     }
     Ok(())

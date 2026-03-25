@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
 use reqwest::{Client, Method, Response};
@@ -12,10 +14,17 @@ use crate::error::{ApiErrorResponse, KalshiError};
 const PROD_BASE_URL: &str = "https://api.elections.kalshi.com/trade-api/v2";
 const DEMO_BASE_URL: &str = "https://demo-api.kalshi.co/trade-api/v2";
 
+const MAX_RETRIES: u32 = 5;
+const INITIAL_BACKOFF_MS: u64 = 1000;
+
+/// Minimum interval between requests (10 req/s to stay well under 20 req/s basic tier).
+const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(100);
+
 pub struct KalshiClient {
     http: Client,
     base_url: String,
     signer: Option<KalshiSigner>,
+    last_request: Mutex<Option<Instant>>,
 }
 
 impl KalshiClient {
@@ -41,6 +50,7 @@ impl KalshiClient {
             http,
             base_url,
             signer,
+            last_request: Mutex::new(None),
         })
     }
 
@@ -94,18 +104,16 @@ impl KalshiClient {
         self.parse_response(resp).await
     }
 
-    async fn send<B: Serialize>(
+    fn build_request<B: Serialize>(
         &self,
-        method: Method,
+        method: &Method,
         path: &str,
         query: &[(&str, &str)],
         body: Option<&B>,
-    ) -> Result<Response> {
+    ) -> Result<reqwest::RequestBuilder> {
         let url = format!("{}{}", self.base_url, path);
-
         let mut req = self.http.request(method.clone(), &url);
 
-        // Auth headers — sign the path only (no query params)
         if let Some(signer) = &self.signer {
             let full_path = format!("/trade-api/v2{}", path);
             let (key_id, timestamp, signature) =
@@ -119,12 +127,67 @@ impl KalshiClient {
         if !query.is_empty() {
             req = req.query(query);
         }
-
         if let Some(body) = body {
             req = req.json(body);
         }
 
-        Ok(req.send().await?)
+        Ok(req)
+    }
+
+    /// Throttle to stay under rate limits.
+    async fn throttle(&self) {
+        let wait = {
+            let mut last = self.last_request.lock().unwrap();
+            let now = Instant::now();
+            let wait = match *last {
+                Some(prev) => {
+                    let elapsed = now.duration_since(prev);
+                    MIN_REQUEST_INTERVAL.saturating_sub(elapsed)
+                }
+                None => Duration::ZERO,
+            };
+            *last = Some(now + wait);
+            wait
+        };
+        if !wait.is_zero() {
+            tokio::time::sleep(wait).await;
+        }
+    }
+
+    async fn send<B: Serialize>(
+        &self,
+        method: Method,
+        path: &str,
+        query: &[(&str, &str)],
+        body: Option<&B>,
+    ) -> Result<Response> {
+        let mut backoff_ms = INITIAL_BACKOFF_MS;
+
+        for attempt in 0..=MAX_RETRIES {
+            self.throttle().await;
+
+            let req = self.build_request(&method, path, query, body)?;
+            let resp = req.send().await?;
+
+            if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                if attempt == MAX_RETRIES {
+                    return Ok(resp);
+                }
+                eprintln!(
+                    "Rate limited, waiting {}s... (retry {}/{})",
+                    backoff_ms / 1000,
+                    attempt + 1,
+                    MAX_RETRIES
+                );
+                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                backoff_ms *= 2;
+                continue;
+            }
+
+            return Ok(resp);
+        }
+
+        unreachable!()
     }
 
     async fn parse_response<T: DeserializeOwned>(&self, resp: Response) -> Result<T> {
@@ -132,9 +195,7 @@ impl KalshiClient {
 
         if status.is_success() {
             let body = resp.text().await?;
-            // Handle empty responses
             if body.is_empty() {
-                // Try to deserialize from empty JSON object
                 return Ok(serde_json::from_str("{}")?);
             }
             Ok(serde_json::from_str(&body)?)

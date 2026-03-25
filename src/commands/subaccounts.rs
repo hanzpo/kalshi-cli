@@ -6,12 +6,12 @@ use crate::models::subaccount::{
     CreateSubaccountRequest, CreateSubaccountResponse, NettingResponse, SubaccountBalancesResponse,
     TransferRequest, TransferResponse, TransfersResponse,
 };
-use crate::output::{OutputFormat, output, print_json};
+use crate::output::{OutputConfig, output, print_json};
 
 pub async fn execute(
     client: &KalshiClient,
     cmd: SubaccountCmd,
-    format: &OutputFormat,
+    out: &OutputConfig,
 ) -> Result<()> {
     client.require_auth()?;
 
@@ -37,7 +37,7 @@ pub async fn execute(
         SubaccountCmd::Balances => {
             let resp: SubaccountBalancesResponse =
                 client.get("/portfolio/subaccounts/balances", &[]).await?;
-            output(&resp.subaccount_balances.unwrap_or_default(), format)?;
+            output(&resp.subaccount_balances.unwrap_or_default(), out)?;
         }
         SubaccountCmd::Transfers { limit, cursor } => {
             let mut query = Vec::new();
@@ -51,13 +51,13 @@ pub async fn execute(
             let resp: TransfersResponse = client
                 .get("/portfolio/subaccounts/transfers", &query)
                 .await?;
-            output(&resp.transfers.unwrap_or_default(), format)?;
+            output(&resp.transfers.unwrap_or_default(), out)?;
         }
         SubaccountCmd::Netting => {
             let resp: NettingResponse = client
                 .get("/portfolio/subaccounts/netting", &[])
                 .await?;
-            print_json(&resp.data)?;
+            print_json(&resp.data, out.no_pager)?;
         }
     }
     Ok(())
