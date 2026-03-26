@@ -219,6 +219,14 @@ pub enum Command {
         #[command(subcommand)]
         cmd: AlertCmd,
     },
+    /// Get the Kalshi website URL for a market ticker
+    Url {
+        /// Market ticker (e.g. KXMARMAD-26-DUKE)
+        ticker: String,
+        /// Open the URL in your browser
+        #[arg(long)]
+        open: bool,
+    },
 }
 
 // ── Config ──

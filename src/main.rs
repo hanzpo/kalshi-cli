@@ -149,6 +149,9 @@ async fn main() -> Result<()> {
             let ws = websocket::KalshiWebSocket::new(&config, demo)?;
             commands::alert::execute(cmd, &ws, &out).await?;
         }
+        Command::Url { ticker, open } => {
+            commands::url::execute(&client, &ticker, open).await?;
+        }
     }
 
     Ok(())
