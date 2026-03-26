@@ -32,8 +32,11 @@ impl KalshiWebSocket {
             PROD_WS_URL.to_string()
         };
 
-        let signer = match (&config.api_key_id, &config.private_key_path) {
-            (Some(key_id), Some(pem_path)) => {
+        let signer = match (&config.api_key_id, &config.private_key, &config.private_key_path) {
+            (Some(key_id), Some(pem), _) => {
+                Some(KalshiSigner::from_pem(key_id.clone(), pem)?)
+            }
+            (Some(key_id), None, Some(pem_path)) => {
                 Some(KalshiSigner::new(key_id.clone(), Path::new(pem_path))?)
             }
             _ => None,

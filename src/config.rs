@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Profile {
     pub api_key_id: Option<String>,
     pub private_key_path: Option<String>,
+    pub private_key: Option<String>,
     pub demo: Option<bool>,
 }
 
@@ -15,6 +16,7 @@ pub struct Profile {
 pub struct Config {
     pub api_key_id: Option<String>,
     pub private_key_path: Option<String>,
+    pub private_key: Option<String>,
     pub default_output: Option<String>,
     pub demo: Option<bool>,
     #[serde(default)]
@@ -42,6 +44,9 @@ impl Config {
         if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY_PATH") {
             config.private_key_path = Some(val);
         }
+        if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY") {
+            config.private_key = Some(val);
+        }
 
         Ok(config)
     }
@@ -62,6 +67,9 @@ impl Config {
             }
             if let Some(ref v) = profile.private_key_path {
                 self.private_key_path = Some(v.clone());
+            }
+            if let Some(ref v) = profile.private_key {
+                self.private_key = Some(v.clone());
             }
             if let Some(v) = profile.demo {
                 self.demo = Some(v);
@@ -128,6 +136,7 @@ mod tests {
             Profile {
                 api_key_id: Some("profile_key".to_string()),
                 private_key_path: Some("/path/to/key".to_string()),
+                private_key: None,
                 demo: Some(true),
             },
         );
@@ -160,6 +169,7 @@ mod tests {
             Profile {
                 api_key_id: Some("override_key".to_string()),
                 private_key_path: None,
+                private_key: None,
                 demo: None,
             },
         );
@@ -187,12 +197,14 @@ mod tests {
             Profile {
                 api_key_id: Some("demo_key".to_string()),
                 private_key_path: None,
+                private_key: None,
                 demo: Some(true),
             },
         );
         let config = Config {
             api_key_id: Some("my_key".to_string()),
             private_key_path: Some("/keys/private.pem".to_string()),
+            private_key: None,
             default_output: Some("json".to_string()),
             demo: Some(false),
             profiles,

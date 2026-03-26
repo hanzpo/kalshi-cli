@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use rsa::RsaPrivateKey;
+use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::pss::BlindedSigningKey;
 use rsa::rand_core::OsRng;
@@ -21,8 +22,13 @@ impl KalshiSigner {
         let pem_contents = std::fs::read_to_string(pem_path)
             .with_context(|| format!("Failed to read private key from {}", pem_path.display()))?;
 
-        let private_key = RsaPrivateKey::from_pkcs8_pem(&pem_contents)
-            .context("Failed to parse RSA private key (expected PKCS#8 PEM format)")?;
+        Self::from_pem(api_key_id, &pem_contents)
+    }
+
+    pub fn from_pem(api_key_id: String, pem_contents: &str) -> Result<Self> {
+        let private_key = RsaPrivateKey::from_pkcs8_pem(pem_contents)
+            .or_else(|_| RsaPrivateKey::from_pkcs1_pem(pem_contents))
+            .context("Failed to parse RSA private key (expected PKCS#8 or PKCS#1 PEM format)")?;
 
         let signing_key = BlindedSigningKey::<Sha256>::new(private_key);
 

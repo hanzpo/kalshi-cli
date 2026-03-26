@@ -184,7 +184,7 @@ pub enum Command {
     },
 
     // ── Real-time ──
-    /// Watch real-time market data via WebSocket
+    /// Watch real-time market data via WebSocket (requires auth)
     Watch {
         #[command(subcommand)]
         cmd: WatchCmd,
@@ -1265,15 +1265,15 @@ pub enum ExportCmd {
 
 #[derive(Subcommand)]
 pub enum WatchCmd {
-    /// Watch live price updates for a market
+    /// Watch live price updates for a market (requires auth)
     Ticker {
         /// Market ticker
         market: String,
     },
-    /// Watch live trades for a market
+    /// Watch live trades for a market, or all trades (requires auth)
     Trade {
-        /// Market ticker
-        market: String,
+        /// Market ticker (omit to watch all trades)
+        market: Option<String>,
     },
     /// Watch your fill notifications (requires auth)
     Fill,
@@ -1308,6 +1308,6 @@ pub enum AlertCmd {
         /// Alert ID (first 8 chars is enough)
         id: String,
     },
-    /// Watch alerts via WebSocket
+    /// Watch alerts via WebSocket (requires auth)
     Watch,
 }

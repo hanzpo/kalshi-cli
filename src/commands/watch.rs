@@ -9,7 +9,7 @@ use crate::websocket::KalshiWebSocket;
 pub async fn execute(ws: &KalshiWebSocket, cmd: WatchCmd, _out: &OutputConfig) -> Result<()> {
     let (channel, market_ticker) = match &cmd {
         WatchCmd::Ticker { market } => ("ticker", Some(market.as_str())),
-        WatchCmd::Trade { market } => ("trade", Some(market.as_str())),
+        WatchCmd::Trade { market } => ("trade", market.as_deref()),
         WatchCmd::Orderbook { market } => ("orderbook_delta", Some(market.as_str())),
         WatchCmd::Fill => ("fill", None),
         WatchCmd::Position => ("position", None),
