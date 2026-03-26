@@ -3,7 +3,8 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
-use reqwest::{Client, Method, Response};
+use rand::Rng;
+use reqwest::{Client, Method, Response, StatusCode};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -15,10 +16,10 @@ const PROD_BASE_URL: &str = "https://api.elections.kalshi.com/trade-api/v2";
 const DEMO_BASE_URL: &str = "https://demo-api.kalshi.co/trade-api/v2";
 
 const MAX_RETRIES: u32 = 5;
-const INITIAL_BACKOFF_MS: u64 = 1000;
+const INITIAL_BACKOFF_MS: u64 = 500;
 
-/// Minimum interval between requests (10 req/s to stay well under 20 req/s basic tier).
-const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(100);
+/// Minimum interval between requests (5 req/s to stay under basic tier limits).
+const MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(200);
 
 pub struct KalshiClient {
     http: Client,
@@ -42,9 +43,7 @@ impl KalshiClient {
             _ => None,
         };
 
-        let http = Client::builder()
-            .user_agent("kalshi-cli/0.1.0")
-            .build()?;
+        let http = Client::builder().user_agent("kalshi-cli/0.1.0").build()?;
 
         Ok(Self {
             http,
@@ -52,6 +51,15 @@ impl KalshiClient {
             signer,
             last_request: Mutex::new(None),
         })
+    }
+
+    pub fn host(&self) -> &str {
+        // base_url is like "https://api.elections.kalshi.com/trade-api/v2"
+        // extract "https://api.elections.kalshi.com"
+        self.base_url
+            .find("/trade-api")
+            .map(|i| &self.base_url[..i])
+            .unwrap_or(&self.base_url)
     }
 
     #[cfg(test)]
@@ -71,29 +79,35 @@ impl KalshiClient {
         Ok(())
     }
 
-    pub async fn get<T: DeserializeOwned>(
-        &self,
-        path: &str,
-        query: &[(&str, &str)],
-    ) -> Result<T> {
-        let resp = self.send(Method::GET, path, query, Option::<&()>::None).await?;
+    pub async fn get<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> Result<T> {
+        let resp = self
+            .send(Method::GET, path, query, Option::<&()>::None)
+            .await?;
         self.parse_response(resp).await
     }
 
-    pub async fn post<B: Serialize, T: DeserializeOwned>(
+    /// GET request to an absolute URL (not relative to base_url).
+    /// Used for internal/undocumented endpoints on different base paths.
+    pub async fn get_absolute<T: DeserializeOwned>(
         &self,
-        path: &str,
-        body: &B,
+        url: &str,
+        query: &[(&str, &str)],
     ) -> Result<T> {
+        self.throttle().await;
+        let mut req = self.http.request(Method::GET, url);
+        if !query.is_empty() {
+            req = req.query(query);
+        }
+        let resp = req.send().await?;
+        self.parse_response(resp).await
+    }
+
+    pub async fn post<B: Serialize, T: DeserializeOwned>(&self, path: &str, body: &B) -> Result<T> {
         let resp = self.send(Method::POST, path, &[], Some(body)).await?;
         self.parse_response(resp).await
     }
 
-    pub async fn put<B: Serialize, T: DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &B,
-    ) -> Result<T> {
+    pub async fn put<B: Serialize, T: DeserializeOwned>(&self, path: &str, body: &B) -> Result<T> {
         let resp = self.send(Method::PUT, path, &[], Some(body)).await?;
         self.parse_response(resp).await
     }
@@ -179,17 +193,34 @@ impl KalshiClient {
             let req = self.build_request(&method, path, query, body)?;
             let resp = req.send().await?;
 
-            if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            let status = resp.status();
+            let retryable = status == StatusCode::TOO_MANY_REQUESTS
+                || (status.is_server_error() && status != StatusCode::NOT_IMPLEMENTED);
+
+            if retryable {
                 if attempt == MAX_RETRIES {
                     return Ok(resp);
                 }
+                // Add jitter: 50-150% of the base backoff
+                let jitter_ms = {
+                    let mut rng = rand::rng();
+                    let half = backoff_ms / 2;
+                    rng.random_range(half..=backoff_ms + half)
+                };
+                let label = if status == StatusCode::TOO_MANY_REQUESTS {
+                    "Rate limited"
+                } else {
+                    "Server error"
+                };
                 eprintln!(
-                    "Rate limited, waiting {}s... (retry {}/{})",
-                    backoff_ms / 1000,
+                    "{} ({}), waiting {:.1}s... (retry {}/{})",
+                    label,
+                    status.as_u16(),
+                    jitter_ms as f64 / 1000.0,
                     attempt + 1,
                     MAX_RETRIES
                 );
-                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+                tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
                 backoff_ms *= 2;
                 continue;
             }
@@ -226,7 +257,10 @@ impl KalshiClient {
             bail!(KalshiError::Api {
                 status: status_code,
                 message: if body.is_empty() {
-                    status.canonical_reason().unwrap_or("Unknown error").to_string()
+                    status
+                        .canonical_reason()
+                        .unwrap_or("Unknown error")
+                        .to_string()
                 } else {
                     body
                 },
@@ -253,7 +287,10 @@ mod tests {
 
     #[test]
     fn prod_base_url_value() {
-        assert_eq!(PROD_BASE_URL, "https://api.elections.kalshi.com/trade-api/v2");
+        assert_eq!(
+            PROD_BASE_URL,
+            "https://api.elections.kalshi.com/trade-api/v2"
+        );
     }
 
     #[test]

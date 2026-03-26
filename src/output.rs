@@ -142,10 +142,7 @@ pub fn output_paginated<T: Serialize + TableDisplay>(
     Ok(())
 }
 
-pub fn output_one<T: Serialize + TableDisplay + Clone>(
-    data: &T,
-    cfg: &OutputConfig,
-) -> Result<()> {
+pub fn output_one<T: Serialize + TableDisplay + Clone>(data: &T, cfg: &OutputConfig) -> Result<()> {
     if cfg.quiet {
         print_quiet(&[data.clone()]);
         return Ok(());

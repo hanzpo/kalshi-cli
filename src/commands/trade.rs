@@ -22,7 +22,10 @@ pub async fn execute_buy(
     let side = if no { "no" } else { "yes" };
 
     let price_display = price.map_or("market".to_string(), |p| format!("{}c", p));
-    let msg = format!("Buy {} {} @ {} on {}?", quantity, side, price_display, ticker);
+    let msg = format!(
+        "Buy {} {} @ {} on {}?",
+        quantity, side, price_display, ticker
+    );
     if !confirm::confirm(&msg, false)? {
         eprintln!("Cancelled.");
         return Ok(());
@@ -63,7 +66,10 @@ pub async fn execute_sell(
     let side = if no { "no" } else { "yes" };
 
     let price_display = price.map_or("market".to_string(), |p| format!("{}c", p));
-    let msg = format!("Sell {} {} @ {} on {}?", quantity, side, price_display, ticker);
+    let msg = format!(
+        "Sell {} {} @ {} on {}?",
+        quantity, side, price_display, ticker
+    );
     if !confirm::confirm(&msg, false)? {
         eprintln!("Cancelled.");
         return Ok(());
@@ -90,15 +96,14 @@ pub async fn execute_sell(
     Ok(())
 }
 
-pub async fn execute_close(
-    client: &KalshiClient,
-    ticker: &str,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute_close(client: &KalshiClient, ticker: &str, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     let positions: PositionsResponse = client
-        .get("/portfolio/positions", &[("ticker", ticker), ("limit", "1000")])
+        .get(
+            "/portfolio/positions",
+            &[("ticker", ticker), ("limit", "10")],
+        )
         .await?;
 
     let pos_list = positions.market_positions.unwrap_or_default();

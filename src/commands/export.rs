@@ -8,7 +8,7 @@ use crate::cli::{ExportCmd, ExportFormat};
 use crate::client::KalshiClient;
 use crate::models::portfolio::{FillsResponse, PositionsResponse, SettlementsResponse};
 use crate::output::{OutputConfig, TableDisplay};
-use crate::pagination::{PaginationOpts, auto_paginate};
+use crate::pagination::{MARKETS_PAGE_SIZE, PaginationOpts, auto_paginate};
 
 pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
@@ -23,6 +23,7 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
                 limit: None,
                 cursor: None,
                 all: true,
+                max_page_size: None,
             };
             let since_str = since.map(|ts| ts.to_string());
             let mut query_params: Vec<(&str, String)> = Vec::new();
@@ -33,8 +34,7 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
             let result = auto_paginate(&opts, |limit, cursor| {
                 let qp = query_params.clone();
                 async move {
-                    let mut q: Vec<(&str, String)> =
-                        vec![("limit", limit.to_string())];
+                    let mut q: Vec<(&str, String)> = vec![("limit", limit.to_string())];
                     if let Some(c) = cursor {
                         q.push(("cursor", c));
                     }
@@ -43,8 +43,7 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
                     }
                     let query_refs: Vec<(&str, &str)> =
                         q.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: FillsResponse =
-                        client.get("/portfolio/fills", &query_refs).await?;
+                    let resp: FillsResponse = client.get("/portfolio/fills", &query_refs).await?;
                     let items = resp.fills.unwrap_or_default();
                     Ok((items, resp.cursor))
                 }
@@ -53,19 +52,16 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
 
             write_export(&result.items, &format, &output, "fills")?;
         }
-        ExportCmd::Position {
-            format,
-            output,
-        } => {
+        ExportCmd::Position { format, output } => {
             let opts = PaginationOpts {
                 limit: None,
                 cursor: None,
                 all: true,
+                max_page_size: Some(MARKETS_PAGE_SIZE),
             };
 
             let result = auto_paginate(&opts, |limit, cursor| async move {
-                let mut q: Vec<(&str, String)> =
-                    vec![("limit", limit.to_string())];
+                let mut q: Vec<(&str, String)> = vec![("limit", limit.to_string())];
                 if let Some(c) = cursor {
                     q.push(("cursor", c));
                 }
@@ -80,30 +76,25 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
 
             write_export(&result.items, &format, &output, "positions")?;
         }
-        ExportCmd::Settlement {
-            format,
-            output,
-        } => {
+        ExportCmd::Settlement { format, output } => {
             let opts = PaginationOpts {
                 limit: None,
                 cursor: None,
                 all: true,
+                max_page_size: None,
             };
 
-            let result = auto_paginate(&opts, |limit, cursor| {
-                async move {
-                    let mut q: Vec<(&str, String)> =
-                        vec![("limit", limit.to_string())];
-                    if let Some(c) = cursor {
-                        q.push(("cursor", c));
-                    }
-                    let query_refs: Vec<(&str, &str)> =
-                        q.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: SettlementsResponse =
-                        client.get("/portfolio/settlements", &query_refs).await?;
-                    let items = resp.settlements.unwrap_or_default();
-                    Ok((items, resp.cursor))
+            let result = auto_paginate(&opts, |limit, cursor| async move {
+                let mut q: Vec<(&str, String)> = vec![("limit", limit.to_string())];
+                if let Some(c) = cursor {
+                    q.push(("cursor", c));
                 }
+                let query_refs: Vec<(&str, &str)> =
+                    q.iter().map(|(k, v)| (*k, v.as_str())).collect();
+                let resp: SettlementsResponse =
+                    client.get("/portfolio/settlements", &query_refs).await?;
+                let items = resp.settlements.unwrap_or_default();
+                Ok((items, resp.cursor))
             })
             .await?;
 
@@ -145,6 +136,11 @@ fn write_export<T: serde::Serialize + TableDisplay>(
         }
     }
 
-    eprintln!("Exported {} {} to {}", items.len(), type_name, path.display());
+    eprintln!(
+        "Exported {} {} to {}",
+        items.len(),
+        type_name,
+        path.display()
+    );
     Ok(())
 }

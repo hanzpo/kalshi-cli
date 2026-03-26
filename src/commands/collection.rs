@@ -4,11 +4,7 @@ use crate::cli::CollectionCmd;
 use crate::client::KalshiClient;
 use crate::output::{OutputConfig, print_json};
 
-pub async fn execute(
-    client: &KalshiClient,
-    cmd: CollectionCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: CollectionCmd, out: &OutputConfig) -> Result<()> {
     match cmd {
         CollectionCmd::List {
             status,
@@ -16,6 +12,7 @@ pub async fn execute(
             series_ticker,
             limit,
             cursor,
+            all: _,
         } => {
             let mut query = Vec::new();
             if let Some(ref s) = status {
@@ -71,10 +68,7 @@ pub async fn execute(
             let body = serde_json::json!({
                 "selected_markets": selected_markets,
             });
-            let path = format!(
-                "/multivariate_event_collections/{}/lookup",
-                ticker
-            );
+            let path = format!("/multivariate_event_collections/{}/lookup", ticker);
             let resp: serde_json::Value = client.put(&path, &body).await?;
             print_json(&resp, out.no_pager)?;
         }
@@ -82,10 +76,7 @@ pub async fn execute(
             ticker,
             lookback_seconds,
         } => {
-            let path = format!(
-                "/multivariate_event_collections/{}/lookup",
-                ticker
-            );
+            let path = format!("/multivariate_event_collections/{}/lookup", ticker);
             let mut query = Vec::new();
             let lookback_str = lookback_seconds.map(|l| l.to_string());
             if let Some(ref l) = lookback_str {

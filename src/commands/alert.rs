@@ -7,11 +7,7 @@ use crate::cli::AlertCmd;
 use crate::output::OutputConfig;
 use crate::websocket::KalshiWebSocket;
 
-pub async fn execute(
-    cmd: AlertCmd,
-    ws: &KalshiWebSocket,
-    _out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute(cmd: AlertCmd, ws: &KalshiWebSocket, _out: &OutputConfig) -> Result<()> {
     let store = AlertStore::new();
 
     match cmd {
@@ -71,7 +67,11 @@ pub async fn execute(
                 sink.send(Message::Text(sub_msg.into())).await?;
             }
 
-            eprintln!("Watching {} alerts across {} tickers...", alerts.len(), tickers.len());
+            eprintln!(
+                "Watching {} alerts across {} tickers...",
+                alerts.len(),
+                tickers.len()
+            );
 
             loop {
                 tokio::select! {
@@ -126,18 +126,12 @@ fn check_alerts(alerts: &[Alert], msg: &serde_json::Value) {
             }
             if let Some(above) = alert.above {
                 if price >= above {
-                    send_notification(&format!(
-                        "Alert: {} price {}c >= {}c",
-                        ticker, price, above
-                    ));
+                    send_notification(&format!("Alert: {} price {}c >= {}c", ticker, price, above));
                 }
             }
             if let Some(below) = alert.below {
                 if price <= below {
-                    send_notification(&format!(
-                        "Alert: {} price {}c <= {}c",
-                        ticker, price, below
-                    ));
+                    send_notification(&format!("Alert: {} price {}c <= {}c", ticker, price, below));
                 }
             }
         }

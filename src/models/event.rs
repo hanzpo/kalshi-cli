@@ -39,8 +39,8 @@ impl TableDisplay for Event {
             self.title
                 .as_ref()
                 .map(|t| {
-                    if t.len() > 50 {
-                        format!("{}...", &t[..47])
+                    if t.chars().count() > 50 {
+                        format!("{}...", t.chars().take(47).collect::<String>())
                     } else {
                         t.clone()
                     }
@@ -72,7 +72,10 @@ mod tests {
     #[test]
     fn headers_returns_five_columns() {
         let h = Event::headers();
-        assert_eq!(h, vec!["Event Ticker", "Series", "Title", "Category", "Status"]);
+        assert_eq!(
+            h,
+            vec!["Event Ticker", "Series", "Title", "Category", "Status"]
+        );
     }
 
     #[test]

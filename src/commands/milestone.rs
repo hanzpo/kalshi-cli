@@ -10,6 +10,7 @@ pub async fn execute(client: &KalshiClient, cmd: MilestoneCmd, out: &OutputConfi
         MilestoneCmd::List {
             limit,
             cursor,
+            all: _,
             minimum_start_date,
             category,
             competition,
@@ -18,7 +19,7 @@ pub async fn execute(client: &KalshiClient, cmd: MilestoneCmd, out: &OutputConfi
             related_event_ticker,
             min_updated_ts,
         } => {
-            let limit_str = limit.to_string();
+            let limit_str = limit.unwrap_or(100).to_string();
             let mut query = vec![("limit", limit_str.as_str())];
             if let Some(ref c) = cursor {
                 query.push(("cursor", c.as_str()));

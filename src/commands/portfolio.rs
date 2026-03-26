@@ -6,14 +6,10 @@ use crate::models::portfolio::{
     Balance, BalanceResponse, FillsResponse, PositionsResponse, RestingValueResponse,
     SettlementsResponse,
 };
-use crate::output::{OutputConfig, output_one, output_paginated};
-use crate::pagination::{PaginationOpts, auto_paginate};
+use crate::output::{OutputConfig, output_one};
+use crate::pagination::{MARKETS_PAGE_SIZE, paginated_list};
 
-pub async fn execute(
-    client: &KalshiClient,
-    cmd: PortfolioCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: PortfolioCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {
@@ -35,8 +31,7 @@ pub async fn execute(
             count_filter,
             settlement_status,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let result = auto_paginate(&opts, |page_limit, page_cursor| {
+            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), out, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let event_ticker = event_ticker.clone();
                 let count_filter = count_filter.clone();
@@ -66,7 +61,6 @@ pub async fn execute(
                 }
             })
             .await?;
-            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::Fill {
             limit,
@@ -77,8 +71,7 @@ pub async fn execute(
             min_ts,
             max_ts,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let result = auto_paginate(&opts, |page_limit, page_cursor| {
+            paginated_list(all, limit, cursor, None, out, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let order_id = order_id.clone();
                 async move {
@@ -100,13 +93,11 @@ pub async fn execute(
                     }
                     let query_refs: Vec<(&str, &str)> =
                         query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: FillsResponse =
-                        client.get("/portfolio/fills", &query_refs).await?;
+                    let resp: FillsResponse = client.get("/portfolio/fills", &query_refs).await?;
                     Ok((resp.fills.unwrap_or_default(), resp.cursor))
                 }
             })
             .await?;
-            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::Settlement {
             limit,
@@ -114,8 +105,7 @@ pub async fn execute(
             all,
             ticker,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let result = auto_paginate(&opts, |page_limit, page_cursor| {
+            paginated_list(all, limit, cursor, None, out, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 async move {
                     let mut query = vec![("limit", page_limit.to_string())];
@@ -133,7 +123,6 @@ pub async fn execute(
                 }
             })
             .await?;
-            output_paginated(&result.items, result.has_more, out)?;
         }
         PortfolioCmd::RestingValue => {
             let resp: RestingValueResponse = client
@@ -145,10 +134,11 @@ pub async fn execute(
             );
         }
         PortfolioCmd::Summary => {
+            // Use sensible limits — positions max 1000, settlements max 200.
             let (balance, positions, settlements) = tokio::try_join!(
                 client.get::<BalanceResponse>("/portfolio/balance", &[]),
-                client.get::<PositionsResponse>("/portfolio/positions", &[("limit", "1000")]),
-                client.get::<SettlementsResponse>("/portfolio/settlements", &[("limit", "1000")]),
+                client.get::<PositionsResponse>("/portfolio/positions", &[("limit", "200")]),
+                client.get::<SettlementsResponse>("/portfolio/settlements", &[("limit", "200")]),
             )?;
 
             let balance_cents = balance.balance.unwrap_or(0);
@@ -159,10 +149,7 @@ pub async fn execute(
             let settle_list = settlements.settlements.unwrap_or_default();
 
             let total_position_count = pos_list.len();
-            let total_contracts: i64 = pos_list
-                .iter()
-                .map(|p| p.position.unwrap_or(0).abs())
-                .sum();
+            let total_contracts: i64 = pos_list.iter().map(|p| p.position.unwrap_or(0).abs()).sum();
 
             let total_settled = settle_list.len();
 
@@ -172,7 +159,10 @@ pub async fn execute(
             println!("Portfolio Value: ${:.2}", portfolio_cents as f64 / 100.0);
             println!("Payout:          ${:.2}", payout_cents as f64 / 100.0);
             println!();
-            println!("Open Positions:  {} ({} contracts)", total_position_count, total_contracts);
+            println!(
+                "Open Positions:  {} ({} contracts)",
+                total_position_count, total_contracts
+            );
             println!("Settlements:     {}", total_settled);
         }
     }

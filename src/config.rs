@@ -31,8 +31,7 @@ impl Config {
             return Ok(Config::default());
         }
 
-        let contents =
-            std::fs::read_to_string(&path).context("Failed to read config file")?;
+        let contents = std::fs::read_to_string(&path).context("Failed to read config file")?;
         let mut config: Config =
             toml::from_str(&contents).context("Failed to parse config file")?;
 
@@ -54,7 +53,9 @@ impl Config {
             None => std::env::var("KALSHI_PROFILE").ok(),
         };
         if let Some(name) = name {
-            let profile = self.profiles.get(&name)
+            let profile = self
+                .profiles
+                .get(&name)
                 .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in config", name))?;
             if let Some(ref v) = profile.api_key_id {
                 self.api_key_id = Some(v.clone());
@@ -108,7 +109,9 @@ mod tests {
     #[test]
     fn test_config_resolve_no_profile() {
         // Unset KALSHI_PROFILE to avoid interference
-        unsafe { std::env::remove_var("KALSHI_PROFILE"); }
+        unsafe {
+            std::env::remove_var("KALSHI_PROFILE");
+        }
         let config = Config {
             api_key_id: Some("key123".to_string()),
             ..Config::default()
@@ -204,7 +207,10 @@ mod tests {
 
         let loaded = Config::load(Some(&path)).unwrap();
         assert_eq!(loaded.api_key_id, Some("my_key".to_string()));
-        assert_eq!(loaded.private_key_path, Some("/keys/private.pem".to_string()));
+        assert_eq!(
+            loaded.private_key_path,
+            Some("/keys/private.pem".to_string())
+        );
         assert_eq!(loaded.default_output, Some("json".to_string()));
         assert_eq!(loaded.demo, Some(false));
         assert!(loaded.profiles.contains_key("demo"));

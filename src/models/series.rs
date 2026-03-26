@@ -31,9 +31,21 @@ impl TableDisplay for Series {
     }
 
     fn row(&self) -> Vec<String> {
+        let title = self
+            .title
+            .as_ref()
+            .map(|t| {
+                if t.chars().count() > 50 {
+                    let truncated: String = t.chars().take(47).collect();
+                    format!("{truncated}...")
+                } else {
+                    t.clone()
+                }
+            })
+            .unwrap_or_else(|| "-".to_string());
         vec![
             format_opt(&self.ticker),
-            format_opt(&self.title),
+            title,
             format_opt(&self.category),
             format_opt(&self.frequency),
         ]

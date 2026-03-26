@@ -7,8 +7,8 @@ use crate::models::order::{
     BatchCreateResponse, CreateOrderRequest, DecreaseOrderRequest, OrderResponse, OrdersResponse,
     QueuePositionsResponse,
 };
-use crate::output::{OutputConfig, output, output_one, output_paginated, print_json};
-use crate::pagination::{PaginationOpts, auto_paginate};
+use crate::output::{OutputConfig, output, output_one, print_json};
+use crate::pagination::paginated_list;
 
 pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
@@ -54,8 +54,7 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -
             ticker,
             status,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let result = auto_paginate(&opts, |page_limit, page_cursor| {
+            paginated_list(all, limit, cursor, None, out, |page_limit, page_cursor| {
                 let ticker = ticker.clone();
                 let status = status.clone();
                 async move {
@@ -71,13 +70,11 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -
                     }
                     let query_refs: Vec<(&str, &str)> =
                         query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: OrdersResponse =
-                        client.get("/portfolio/orders", &query_refs).await?;
+                    let resp: OrdersResponse = client.get("/portfolio/orders", &query_refs).await?;
                     Ok((resp.orders.unwrap_or_default(), resp.cursor))
                 }
             })
             .await?;
-            output_paginated(&result.items, result.has_more, out)?;
         }
         OrderCmd::Get { order_id } => {
             let path = format!("/portfolio/orders/{}", order_id);
@@ -122,29 +119,27 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -
         OrderCmd::BatchCreate { file } => {
             let contents = std::fs::read_to_string(&file)
                 .with_context(|| format!("Failed to read {}", file.display()))?;
-            let orders: Vec<CreateOrderRequest> = serde_json::from_str(&contents)
-                .context("Failed to parse order JSON file")?;
+            let orders: Vec<CreateOrderRequest> =
+                serde_json::from_str(&contents).context("Failed to parse order JSON file")?;
             if orders.len() > 20 {
                 anyhow::bail!("Batch create supports a maximum of 20 orders");
             }
             let req = BatchCreateRequest { orders };
-            let resp: BatchCreateResponse =
-                client.post("/portfolio/orders/batched", &req).await?;
+            let resp: BatchCreateResponse = client.post("/portfolio/orders/batched", &req).await?;
             output(&resp.orders.unwrap_or_default(), out)?;
         }
         OrderCmd::BatchCancel { ticker, order_ids } => {
             let req = BatchCancelRequest { ticker, order_ids };
-            let resp: BatchCancelResponse =
-                client.delete_with_body("/portfolio/orders/batched", &req).await?;
-            println!(
-                "Orders canceled: {}",
-                resp.orders_canceled.unwrap_or(0)
-            );
+            let resp: BatchCancelResponse = client
+                .delete_with_body("/portfolio/orders/batched", &req)
+                .await?;
+            println!("Orders canceled: {}", resp.orders_canceled.unwrap_or(0));
         }
         OrderCmd::Queue { ticker } => {
             let query = [("ticker", ticker.as_str())];
-            let resp: QueuePositionsResponse =
-                client.get("/portfolio/orders/queue_positions", &query).await?;
+            let resp: QueuePositionsResponse = client
+                .get("/portfolio/orders/queue_positions", &query)
+                .await?;
             print_json(&resp.queue_positions, out.no_pager)?;
         }
         OrderCmd::QueuePosition { order_id } => {

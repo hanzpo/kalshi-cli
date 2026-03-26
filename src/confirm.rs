@@ -1,5 +1,5 @@
-use std::io::{self, Write, IsTerminal};
 use anyhow::{Result, bail};
+use std::io::{self, IsTerminal, Write};
 
 pub fn confirm(message: &str, skip: bool) -> Result<bool> {
     if skip {

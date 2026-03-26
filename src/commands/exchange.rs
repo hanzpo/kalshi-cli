@@ -2,7 +2,9 @@ use anyhow::Result;
 
 use crate::cli::ExchangeCmd;
 use crate::client::KalshiClient;
-use crate::models::exchange::{ExchangeStatus, ExchangeStatusResponse, ScheduleResponse, UserDataTimestampResponse};
+use crate::models::exchange::{
+    ExchangeStatus, ExchangeStatusResponse, ScheduleResponse, UserDataTimestampResponse,
+};
 use crate::output::{OutputConfig, output_one, print_json};
 
 pub async fn execute(client: &KalshiClient, cmd: ExchangeCmd, out: &OutputConfig) -> Result<()> {
@@ -25,8 +27,12 @@ pub async fn execute(client: &KalshiClient, cmd: ExchangeCmd, out: &OutputConfig
         }
         ExchangeCmd::UserDataTimestamp => {
             client.require_auth()?;
-            let resp: UserDataTimestampResponse = client.get("/exchange/user_data_timestamp", &[]).await?;
-            println!("User data as of: {}", resp.as_of_time.unwrap_or_else(|| "-".to_string()));
+            let resp: UserDataTimestampResponse =
+                client.get("/exchange/user_data_timestamp", &[]).await?;
+            println!(
+                "User data as of: {}",
+                resp.as_of_time.unwrap_or_else(|| "-".to_string())
+            );
         }
     }
     Ok(())

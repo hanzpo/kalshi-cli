@@ -12,15 +12,11 @@ const PROD_WS_URL: &str = "wss://api.elections.kalshi.com/trade-api/ws/v2";
 const DEMO_WS_URL: &str = "wss://demo-api.kalshi.co/trade-api/ws/v2";
 
 pub type WsSink = futures_util::stream::SplitSink<
-    tokio_tungstenite::WebSocketStream<
-        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-    >,
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
     tungstenite::Message,
 >;
 pub type WsStream = futures_util::stream::SplitStream<
-    tokio_tungstenite::WebSocketStream<
-        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-    >,
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>,
 >;
 
 pub struct KalshiWebSocket {
@@ -62,11 +58,7 @@ impl KalshiWebSocket {
         Ok((sink, stream))
     }
 
-    pub fn subscribe_msg(
-        id: u64,
-        channels: &[&str],
-        market_ticker: Option<&str>,
-    ) -> String {
+    pub fn subscribe_msg(id: u64, channels: &[&str], market_ticker: Option<&str>) -> String {
         let mut msg = serde_json::json!({
             "id": id,
             "cmd": "subscribe",
@@ -81,11 +73,7 @@ impl KalshiWebSocket {
     }
 
     #[allow(dead_code)]
-    pub fn unsubscribe_msg(
-        id: u64,
-        channels: &[&str],
-        market_ticker: Option<&str>,
-    ) -> String {
+    pub fn unsubscribe_msg(id: u64, channels: &[&str], market_ticker: Option<&str>) -> String {
         let mut msg = serde_json::json!({
             "id": id,
             "cmd": "unsubscribe",
@@ -148,7 +136,13 @@ mod tests {
         let msg = KalshiWebSocket::subscribe_msg(1, &["ticker"], None);
         let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
         // The key should not exist in the JSON object
-        assert!(parsed["params"].as_object().unwrap().get("market_ticker").is_none());
+        assert!(
+            parsed["params"]
+                .as_object()
+                .unwrap()
+                .get("market_ticker")
+                .is_none()
+        );
     }
 
     #[test]
@@ -157,7 +151,13 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
         assert_eq!(parsed["cmd"], "unsubscribe");
         assert_eq!(parsed["id"], 3);
-        assert!(parsed["params"].as_object().unwrap().get("market_ticker").is_none());
+        assert!(
+            parsed["params"]
+                .as_object()
+                .unwrap()
+                .get("market_ticker")
+                .is_none()
+        );
     }
 
     #[test]

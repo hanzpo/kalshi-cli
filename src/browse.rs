@@ -61,7 +61,9 @@ async fn show_retry_countdown(total_ms: u64, attempt: u32) {
     let total_secs = (total_ms + 999) / 1000; // round up
     for remaining in (1..=total_secs).rev() {
         // \r overwrites the current line; raw mode is off here
-        print!("\r  Rate limited — retrying in {remaining}s (attempt {attempt}/{MAX_RETRIES})...  ");
+        print!(
+            "\r  Rate limited — retrying in {remaining}s (attempt {attempt}/{MAX_RETRIES})...  "
+        );
         let _ = io::stdout().flush();
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
@@ -204,13 +206,16 @@ fn read_key() -> Result<Action> {
 
 fn read_key_inner() -> Result<Action> {
     loop {
-        if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+        if let Event::Key(KeyEvent {
+            code, modifiers, ..
+        }) = event::read()?
+        {
             match code {
                 KeyCode::Char('n') | KeyCode::Right => return Ok(Action::NextPage),
                 KeyCode::Char('p') | KeyCode::Left => return Ok(Action::PrevPage),
                 KeyCode::Char('q') | KeyCode::Esc => return Ok(Action::Quit),
                 KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
-                    return Ok(Action::Quit)
+                    return Ok(Action::Quit);
                 }
                 _ => {}
             }

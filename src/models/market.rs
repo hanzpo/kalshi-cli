@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::models::common::format_opt;
 use crate::output::TableDisplay;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Market {
     pub ticker: Option<String>,
     pub event_ticker: Option<String>,
@@ -60,7 +60,14 @@ pub struct MarketResponse {
 impl TableDisplay for Market {
     fn headers() -> Vec<&'static str> {
         vec![
-            "Ticker", "Title", "Status", "Yes Bid", "Yes Ask", "Last Price", "Volume", "Open Int",
+            "Ticker",
+            "Title",
+            "Status",
+            "Yes Bid",
+            "Yes Ask",
+            "Last Price",
+            "Volume",
+            "Open Int",
         ]
     }
 
@@ -120,7 +127,15 @@ pub struct TradesResponse {
 
 impl TableDisplay for Trade {
     fn headers() -> Vec<&'static str> {
-        vec!["Trade ID", "Ticker", "Count", "Yes Price", "No Price", "Taker Side", "Time"]
+        vec![
+            "Trade ID",
+            "Ticker",
+            "Count",
+            "Yes Price",
+            "No Price",
+            "Taker Side",
+            "Time",
+        ]
     }
 
     fn row(&self) -> Vec<String> {
@@ -176,6 +191,97 @@ impl TableDisplay for Candlestick {
     }
 }
 
+// ── Search API (internal/undocumented v1 endpoint) ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchMarket {
+    pub ticker: Option<String>,
+    pub yes_subtitle: Option<String>,
+    pub yes_bid: Option<i64>,
+    pub yes_ask: Option<i64>,
+    pub last_price: Option<i64>,
+    pub volume: Option<i64>,
+    pub close_ts: Option<String>,
+    pub open_ts: Option<String>,
+    pub result: Option<String>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchEvent {
+    pub series_ticker: Option<String>,
+    pub event_ticker: Option<String>,
+    pub event_title: Option<String>,
+    pub category: Option<String>,
+    pub total_volume: Option<i64>,
+    pub active_market_count: Option<i64>,
+    pub markets: Option<Vec<SearchMarket>>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+impl TableDisplay for SearchEvent {
+    fn headers() -> Vec<&'static str> {
+        vec![
+            "Event",
+            "Title",
+            "Category",
+            "Markets",
+            "Volume",
+            "Top Market",
+            "Yes Bid",
+            "Yes Ask",
+        ]
+    }
+
+    fn row(&self) -> Vec<String> {
+        let title = self
+            .event_title
+            .as_ref()
+            .map(|t| {
+                if t.chars().count() > 45 {
+                    let truncated: String = t.chars().take(42).collect();
+                    format!("{truncated}...")
+                } else {
+                    t.clone()
+                }
+            })
+            .unwrap_or_else(|| "-".to_string());
+
+        let first_market = self.markets.as_ref().and_then(|m| m.first());
+        let top_subtitle = first_market
+            .and_then(|m| m.yes_subtitle.as_deref())
+            .unwrap_or("-");
+        let bid = first_market
+            .and_then(|m| m.yes_bid)
+            .map_or("-".to_string(), |v| format!("{}¢", v));
+        let ask = first_market
+            .and_then(|m| m.yes_ask)
+            .map_or("-".to_string(), |v| format!("{}¢", v));
+
+        vec![
+            format_opt(&self.event_ticker),
+            title,
+            format_opt(&self.category),
+            self.active_market_count
+                .map_or("-".to_string(), |v| v.to_string()),
+            self.total_volume
+                .map_or("-".to_string(), |v| v.to_string()),
+            top_subtitle.to_string(),
+            bid,
+            ask,
+        ]
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchResponse {
+    pub total_results_count: Option<i64>,
+    pub current_page: Option<Vec<SearchEvent>>,
+    pub next_cursor: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,7 +333,16 @@ mod tests {
         let headers = Market::headers();
         assert_eq!(
             headers,
-            vec!["Ticker", "Title", "Status", "Yes Bid", "Yes Ask", "Last Price", "Volume", "Open Int"]
+            vec![
+                "Ticker",
+                "Title",
+                "Status",
+                "Yes Bid",
+                "Yes Ask",
+                "Last Price",
+                "Volume",
+                "Open Int"
+            ]
         );
     }
 
@@ -295,7 +410,18 @@ mod tests {
     #[test]
     fn test_trade_headers() {
         let headers = Trade::headers();
-        assert_eq!(headers, vec!["Trade ID", "Ticker", "Count", "Yes Price", "No Price", "Taker Side", "Time"]);
+        assert_eq!(
+            headers,
+            vec![
+                "Trade ID",
+                "Ticker",
+                "Count",
+                "Yes Price",
+                "No Price",
+                "Taker Side",
+                "Time"
+            ]
+        );
     }
 
     #[test]
@@ -339,7 +465,10 @@ mod tests {
     #[test]
     fn test_candlestick_headers() {
         let headers = Candlestick::headers();
-        assert_eq!(headers, vec!["Start", "Open", "High", "Low", "Close", "Volume"]);
+        assert_eq!(
+            headers,
+            vec!["Start", "Open", "High", "Low", "Close", "Volume"]
+        );
     }
 
     #[test]

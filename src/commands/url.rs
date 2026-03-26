@@ -46,8 +46,12 @@ fn slugify(s: &str) -> String {
 }
 
 pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<()> {
-    let (series_ticker, event_ticker) = parse_ticker(ticker)
-        .ok_or_else(|| anyhow::anyhow!("Could not parse ticker '{}' — expected format like KXMARMAD-26-DUKE", ticker))?;
+    let (series_ticker, event_ticker) = parse_ticker(ticker).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Could not parse ticker '{}' — expected format like KXMARMAD-26-DUKE",
+            ticker
+        )
+    })?;
 
     // Fetch the event to get its sub_title for the URL slug
     let path = format!("/events/{}", event_ticker);
@@ -62,7 +66,10 @@ pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<
 
     let slug = match sub_title {
         Some(title) => slugify(title),
-        None => bail!("Event '{}' has no title to build URL slug from", event_ticker),
+        None => bail!(
+            "Event '{}' has no title to build URL slug from",
+            event_ticker
+        ),
     };
 
     let url = format!(

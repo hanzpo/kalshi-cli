@@ -18,7 +18,7 @@ pub const BANNER: &str = "\
 #[derive(Parser)]
 #[command(name = "kalshi", about = "CLI for the Kalshi prediction market API", version, before_help = BANNER)]
 pub struct Cli {
-    /// Use demo/sandbox environment
+    /// Use demo environment
     #[arg(long, global = true)]
     pub demo: bool,
 
@@ -314,6 +314,9 @@ pub enum MarketCmd {
         series_ticker: Option<String>,
         #[arg(long)]
         event_ticker: Option<String>,
+        /// Include combo/multivariate markets (excluded by default)
+        #[arg(long)]
+        include_combos: bool,
     },
     /// Get a single market
     Get {
@@ -378,23 +381,39 @@ pub enum MarketCmd {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
+        cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
         status: Option<String>,
+        /// Include combo/multivariate markets (excluded by default)
+        #[arg(long)]
+        include_combos: bool,
     },
     /// Show hottest markets by volume
     Hot {
         #[arg(long, default_value = "20")]
         limit: u32,
+        /// Include combo/multivariate markets (excluded by default)
+        #[arg(long)]
+        include_combos: bool,
     },
     /// Show markets expiring soon
     Expiring {
         /// Hours from now
         #[arg(long, default_value = "24")]
         within: u64,
+        /// Include combo/multivariate markets (excluded by default)
+        #[arg(long)]
+        include_combos: bool,
     },
     /// Show markets with widest bid-ask spread
     Spread {
         #[arg(long, default_value = "20")]
         limit: u32,
+        /// Include combo/multivariate markets (excluded by default)
+        #[arg(long)]
+        include_combos: bool,
     },
     /// Analyze orderbook for a market (requires auth)
     Analyze {
@@ -658,6 +677,8 @@ pub enum OrderGroupCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
     /// Create an order group
     Create {
@@ -763,6 +784,8 @@ pub enum HistoricalCmd {
         #[arg(long)]
         cursor: Option<String>,
         #[arg(long)]
+        all: bool,
+        #[arg(long)]
         ticker: Option<String>,
         #[arg(long)]
         min_close_ts: Option<i64>,
@@ -775,6 +798,8 @@ pub enum HistoricalCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
         #[arg(long)]
         ticker: Option<String>,
         #[arg(long)]
@@ -806,6 +831,8 @@ pub enum HistoricalCmd {
         #[arg(long)]
         cursor: Option<String>,
         #[arg(long)]
+        all: bool,
+        #[arg(long)]
         ticker: Option<String>,
     },
     /// Get historical orders (requires auth)
@@ -814,6 +841,8 @@ pub enum HistoricalCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
         #[arg(long)]
         ticker: Option<String>,
     },
@@ -854,6 +883,8 @@ pub enum SubaccountCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
     /// Get netting settings
     Netting,
@@ -906,6 +937,8 @@ pub enum RfqCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
     /// Create an RFQ
     Create {
@@ -999,9 +1032,11 @@ pub enum MilestoneCmd {
     List {
         /// Number of results (1-500)
         #[arg(long)]
-        limit: u32,
+        limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
         #[arg(long)]
         minimum_start_date: Option<String>,
         #[arg(long)]
@@ -1058,6 +1093,8 @@ pub enum StructuredTargetCmd {
         page_size: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
     /// Get a single structured target
     Get {
@@ -1080,6 +1117,8 @@ pub enum IncentiveProgramCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
 }
 
@@ -1094,6 +1133,8 @@ pub enum FcmCmd {
         subtrader_id: String,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
         #[arg(long)]
         event_ticker: Option<String>,
         #[arg(long)]
@@ -1124,6 +1165,8 @@ pub enum FcmCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
 }
 
@@ -1143,6 +1186,8 @@ pub enum CollectionCmd {
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
+        #[arg(long)]
+        all: bool,
     },
     /// Get a single collection
     Get {

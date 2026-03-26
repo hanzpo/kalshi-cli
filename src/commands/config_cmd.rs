@@ -44,7 +44,10 @@ pub async fn execute(cmd: ConfigCmd) -> Result<()> {
         }
         ConfigCmd::Show => {
             let config = Config::load(None)?;
-            println!("Config file: {}", Config::config_dir().join("config.toml").display());
+            println!(
+                "Config file: {}",
+                Config::config_dir().join("config.toml").display()
+            );
             println!();
             println!(
                 "api_key_id: {}",

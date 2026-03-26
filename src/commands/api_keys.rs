@@ -2,14 +2,12 @@ use anyhow::Result;
 
 use crate::cli::ApiKeyCmd;
 use crate::client::KalshiClient;
-use crate::models::api_key::{ApiKeyResponse, ApiKeysResponse, CreateApiKeyRequest, GenerateApiKeyRequest};
+use crate::models::api_key::{
+    ApiKeyResponse, ApiKeysResponse, CreateApiKeyRequest, GenerateApiKeyRequest,
+};
 use crate::output::{OutputConfig, output, print_json};
 
-pub async fn execute(
-    client: &KalshiClient,
-    cmd: ApiKeyCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: ApiKeyCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {

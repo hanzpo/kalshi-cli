@@ -9,11 +9,16 @@ use crate::output::{OutputConfig, print_table};
 pub async fn execute(client: &KalshiClient, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
+    // Use small limits — this is a summary view, we only need counts.
+    // Positions/orders max per page: 1000/200 respectively.
     let (exchange, balance, positions, orders, fills) = tokio::try_join!(
         client.get::<ExchangeStatusResponse>("/exchange/status", &[]),
         client.get::<BalanceResponse>("/portfolio/balance", &[]),
-        client.get::<PositionsResponse>("/portfolio/positions", &[("limit", "1000")]),
-        client.get::<OrdersResponse>("/portfolio/orders", &[("status", "resting"), ("limit", "1000")]),
+        client.get::<PositionsResponse>("/portfolio/positions", &[("limit", "200")]),
+        client.get::<OrdersResponse>(
+            "/portfolio/orders",
+            &[("status", "resting"), ("limit", "200")]
+        ),
         client.get::<FillsResponse>("/portfolio/fills", &[("limit", "5")]),
     )?;
 
@@ -26,10 +31,7 @@ pub async fn execute(client: &KalshiClient, out: &OutputConfig) -> Result<()> {
 
     let balance_cents = balance.balance.unwrap_or(0);
     let portfolio_cents = balance.portfolio_value.unwrap_or(0);
-    let position_count = positions
-        .market_positions
-        .as_ref()
-        .map_or(0, |p| p.len());
+    let position_count = positions.market_positions.as_ref().map_or(0, |p| p.len());
     let order_count = orders.orders.as_ref().map_or(0, |o| o.len());
 
     eprintln!(

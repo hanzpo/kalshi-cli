@@ -17,6 +17,7 @@ pub async fn execute(client: &KalshiClient, cmd: FcmCmd, out: &OutputConfig) -> 
             max_ts,
             status,
             limit,
+            all: _,
         } => {
             let mut query = vec![("subtrader_id", subtrader_id.as_str())];
             if let Some(ref c) = cursor {
@@ -54,6 +55,7 @@ pub async fn execute(client: &KalshiClient, cmd: FcmCmd, out: &OutputConfig) -> 
             settlement_status,
             limit,
             cursor,
+            all: _,
         } => {
             let mut query = vec![("subtrader_id", subtrader_id.as_str())];
             if let Some(ref t) = ticker {

@@ -4,8 +4,8 @@ use crate::cli::EventCmd;
 use crate::client::KalshiClient;
 use crate::models::event::{EventResponse, EventsResponse};
 use crate::models::market::CandlesticksResponse;
-use crate::output::{OutputConfig, output, output_one, output_paginated, print_json};
-use crate::pagination::{PaginationOpts, auto_paginate};
+use crate::output::{OutputConfig, output, output_one, print_json};
+use crate::pagination::paginated_list;
 
 pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -> Result<()> {
     match cmd {
@@ -18,8 +18,7 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
             category,
             with_nested_markets,
         } => {
-            let opts = PaginationOpts { limit, cursor, all };
-            let result = auto_paginate(&opts, |page_limit, page_cursor| {
+            paginated_list(all, limit, cursor, None, out, |page_limit, page_cursor| {
                 let status = status.clone();
                 let series_ticker = series_ticker.clone();
                 let category = category.clone();
@@ -47,7 +46,6 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
                 }
             })
             .await?;
-            output_paginated(&result.items, result.has_more, out)?;
         }
         EventCmd::Get {
             event_ticker,
@@ -100,7 +98,10 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
             end_ts,
             period,
         } => {
-            let path = format!("/series/{}/events/{}/candlesticks", series_ticker, event_ticker);
+            let path = format!(
+                "/series/{}/events/{}/candlesticks",
+                series_ticker, event_ticker
+            );
             let mut query = Vec::new();
             let period_str = period.map(|p| p.to_string());
             let start_str = start_ts.map(|t| t.to_string());
@@ -132,8 +133,7 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
             let period_str = period.to_string();
             let start_str = start_ts.to_string();
             let end_str = end_ts.to_string();
-            let percentile_strs: Vec<String> =
-                percentiles.iter().map(|p| p.to_string()).collect();
+            let percentile_strs: Vec<String> = percentiles.iter().map(|p| p.to_string()).collect();
             let mut query: Vec<(&str, &str)> = percentile_strs
                 .iter()
                 .map(|p| ("percentiles", p.as_str()))

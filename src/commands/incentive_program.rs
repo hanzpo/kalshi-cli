@@ -15,6 +15,7 @@ pub async fn execute(
             program_type,
             limit,
             cursor,
+            all: _,
         } => {
             let mut query = Vec::new();
             if let Some(ref s) = status {
@@ -30,8 +31,7 @@ pub async fn execute(
             if let Some(ref c) = cursor {
                 query.push(("cursor", c.as_str()));
             }
-            let resp: serde_json::Value =
-                client.get("/incentive_programs", &query).await?;
+            let resp: serde_json::Value = client.get("/incentive_programs", &query).await?;
             print_json(&resp, out.no_pager)?;
         }
     }

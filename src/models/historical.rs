@@ -26,9 +26,20 @@ impl TableDisplay for HistoricalMarket {
     }
 
     fn row(&self) -> Vec<String> {
+        let title = self
+            .title
+            .as_ref()
+            .map(|t| {
+                if t.chars().count() > 50 {
+                    format!("{}...", &t.chars().take(47).collect::<String>())
+                } else {
+                    t.clone()
+                }
+            })
+            .unwrap_or_else(|| "-".to_string());
         vec![
             format_opt(&self.ticker),
-            format_opt(&self.title),
+            title,
             format_opt(&self.status),
             format_opt(&self.close_time),
             format_opt(&self.result),

@@ -3,20 +3,15 @@ use anyhow::Result;
 use crate::cli::{QuoteCmd, RfqCmd};
 use crate::client::KalshiClient;
 use crate::models::communications::{
-    CreateQuoteRequest, CreateRfqRequest, QuoteResponse, QuotesResponse, RfqResponse,
-    RfqsResponse,
+    CreateQuoteRequest, CreateRfqRequest, QuoteResponse, QuotesResponse, RfqResponse, RfqsResponse,
 };
 use crate::output::{OutputConfig, output, output_one, print_json};
 
-pub async fn execute_rfq(
-    client: &KalshiClient,
-    cmd: RfqCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute_rfq(client: &KalshiClient, cmd: RfqCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {
-        RfqCmd::List { limit, cursor } => {
+        RfqCmd::List { limit, cursor, all: _ } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {
@@ -67,11 +62,7 @@ pub async fn execute_rfq(
     Ok(())
 }
 
-pub async fn execute_quote(
-    client: &KalshiClient,
-    cmd: QuoteCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute_quote(client: &KalshiClient, cmd: QuoteCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {

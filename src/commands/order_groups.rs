@@ -7,15 +7,11 @@ use crate::models::order_group::{
 };
 use crate::output::{OutputConfig, output, output_one, print_json};
 
-pub async fn execute(
-    client: &KalshiClient,
-    cmd: OrderGroupCmd,
-    out: &OutputConfig,
-) -> Result<()> {
+pub async fn execute(client: &KalshiClient, cmd: OrderGroupCmd, out: &OutputConfig) -> Result<()> {
     client.require_auth()?;
 
     match cmd {
-        OrderGroupCmd::List { limit, cursor } => {
+        OrderGroupCmd::List { limit, cursor, all: _ } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {
@@ -24,8 +20,7 @@ pub async fn execute(
             if let Some(ref c) = cursor {
                 query.push(("cursor", c.as_str()));
             }
-            let resp: OrderGroupsResponse =
-                client.get("/portfolio/order_groups", &query).await?;
+            let resp: OrderGroupsResponse = client.get("/portfolio/order_groups", &query).await?;
             output(&resp.order_groups.unwrap_or_default(), out)?;
         }
         OrderGroupCmd::Create { max_loss } => {

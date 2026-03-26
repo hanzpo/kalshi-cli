@@ -103,7 +103,10 @@ mod tests {
     #[test]
     fn rfq_headers() {
         let h = Rfq::headers();
-        assert_eq!(h, vec!["RFQ ID", "Ticker", "Side", "Count", "Status", "Created"]);
+        assert_eq!(
+            h,
+            vec!["RFQ ID", "Ticker", "Side", "Count", "Status", "Created"]
+        );
     }
 
     #[test]

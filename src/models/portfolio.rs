@@ -19,7 +19,11 @@ pub struct BalanceResponse {
 
 impl TableDisplay for Balance {
     fn headers() -> Vec<&'static str> {
-        vec!["Balance (cents)", "Portfolio Value (cents)", "Payout (cents)"]
+        vec![
+            "Balance (cents)",
+            "Portfolio Value (cents)",
+            "Payout (cents)",
+        ]
     }
 
     fn row(&self) -> Vec<String> {
@@ -52,7 +56,14 @@ pub struct PositionsResponse {
 
 impl TableDisplay for Position {
     fn headers() -> Vec<&'static str> {
-        vec!["Ticker", "Position", "Exposure", "Realized PnL", "Fees Paid", "Total Traded"]
+        vec![
+            "Ticker",
+            "Position",
+            "Exposure",
+            "Realized PnL",
+            "Fees Paid",
+            "Total Traded",
+        ]
     }
 
     fn row(&self) -> Vec<String> {
@@ -92,7 +103,17 @@ pub struct FillsResponse {
 
 impl TableDisplay for Fill {
     fn headers() -> Vec<&'static str> {
-        vec!["Fill ID", "Ticker", "Side", "Action", "Count", "Yes Price", "No Price", "Fee", "Time"]
+        vec![
+            "Fill ID",
+            "Ticker",
+            "Side",
+            "Action",
+            "Count",
+            "Yes Price",
+            "No Price",
+            "Fee",
+            "Time",
+        ]
     }
 
     fn row(&self) -> Vec<String> {
@@ -131,7 +152,15 @@ pub struct SettlementsResponse {
 
 impl TableDisplay for Settlement {
     fn headers() -> Vec<&'static str> {
-        vec!["Ticker", "Result", "Yes Count", "No Count", "Revenue", "Fee", "Settled"]
+        vec![
+            "Ticker",
+            "Result",
+            "Yes Count",
+            "No Count",
+            "Revenue",
+            "Fee",
+            "Settled",
+        ]
     }
 
     fn row(&self) -> Vec<String> {
@@ -159,7 +188,14 @@ mod tests {
     #[test]
     fn test_balance_headers() {
         let headers = Balance::headers();
-        assert_eq!(headers, vec!["Balance (cents)", "Portfolio Value (cents)", "Payout (cents)"]);
+        assert_eq!(
+            headers,
+            vec![
+                "Balance (cents)",
+                "Portfolio Value (cents)",
+                "Payout (cents)"
+            ]
+        );
     }
 
     #[test]
@@ -191,7 +227,17 @@ mod tests {
     #[test]
     fn test_position_headers() {
         let headers = Position::headers();
-        assert_eq!(headers, vec!["Ticker", "Position", "Exposure", "Realized PnL", "Fees Paid", "Total Traded"]);
+        assert_eq!(
+            headers,
+            vec![
+                "Ticker",
+                "Position",
+                "Exposure",
+                "Realized PnL",
+                "Fees Paid",
+                "Total Traded"
+            ]
+        );
     }
 
     #[test]
@@ -238,7 +284,17 @@ mod tests {
         let headers = Fill::headers();
         assert_eq!(
             headers,
-            vec!["Fill ID", "Ticker", "Side", "Action", "Count", "Yes Price", "No Price", "Fee", "Time"]
+            vec![
+                "Fill ID",
+                "Ticker",
+                "Side",
+                "Action",
+                "Count",
+                "Yes Price",
+                "No Price",
+                "Fee",
+                "Time"
+            ]
         );
     }
 
@@ -295,7 +351,18 @@ mod tests {
     #[test]
     fn test_settlement_headers() {
         let headers = Settlement::headers();
-        assert_eq!(headers, vec!["Ticker", "Result", "Yes Count", "No Count", "Revenue", "Fee", "Settled"]);
+        assert_eq!(
+            headers,
+            vec![
+                "Ticker",
+                "Result",
+                "Yes Count",
+                "No Count",
+                "Revenue",
+                "Fee",
+                "Settled"
+            ]
+        );
     }
 
     #[test]

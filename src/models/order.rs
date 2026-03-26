@@ -118,8 +118,16 @@ pub struct QueuePositionsResponse {
 impl TableDisplay for Order {
     fn headers() -> Vec<&'static str> {
         vec![
-            "Order ID", "Ticker", "Side", "Action", "Status", "Yes Price", "No Price", "Count",
-            "Remaining", "Created",
+            "Order ID",
+            "Ticker",
+            "Side",
+            "Action",
+            "Status",
+            "Yes Price",
+            "No Price",
+            "Count",
+            "Remaining",
+            "Created",
         ]
     }
 
@@ -127,7 +135,13 @@ impl TableDisplay for Order {
         vec![
             self.order_id
                 .as_ref()
-                .map(|id| if id.len() > 12 { format!("{}...", &id[..12]) } else { id.clone() })
+                .map(|id| {
+                    if id.len() > 12 {
+                        format!("{}...", &id[..12])
+                    } else {
+                        id.clone()
+                    }
+                })
                 .unwrap_or_else(|| "-".to_string()),
             format_opt(&self.ticker),
             format_opt(&self.side),
