@@ -139,12 +139,19 @@ kalshi
 │   ├── position -o <path>          Export positions
 │   └── settlement -o <path>        Export settlements
 │
-├── watch                           Real-time WebSocket feeds
-│   ├── ticker <market>             Live price updates
-│   ├── trade <market>              Live trades
-│   ├── orderbook <market>          Live orderbook deltas (requires auth)
-│   ├── fill                        Your fill notifications (requires auth)
-│   └── position                    Your position updates (requires auth)
+├── watch                           Real-time WebSocket feeds (requires auth)
+│   ├── ticker <market> [<market>...]   Live price updates
+│   ├── trade [<market>...]         Live trades (all markets if none specified)
+│   ├── orderbook <market> [...]    Live orderbook deltas
+│   │   └── --snapshot              Request initial orderbook snapshot
+│   ├── fill [<market>...]          Your fill notifications
+│   ├── position [<market>...]      Your position updates
+│   ├── order [<market>...]         Your order status updates
+│   ├── lifecycle                   Market & event lifecycle changes
+│   ├── communications              RFQ and quote notifications
+│   ├── order-group-updates         Order group updates
+│   ├── multivar-lifecycle          Multivariate market lifecycle changes
+│   └── multivariate                Multivariate collection lookups
 │
 ├── alert                           Price alerts
 │   ├── add <ticker>                Set a price alert
