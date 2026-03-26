@@ -105,11 +105,13 @@ pub enum Command {
 
     // ── Browse & discover ──
     /// Markets (list, search, orderbook, analytics)
+    #[command(alias = "markets")]
     Market {
         #[command(subcommand)]
         cmd: MarketCmd,
     },
     /// Events (groups of related markets)
+    #[command(alias = "events")]
     Event {
         #[command(subcommand)]
         cmd: EventCmd,
@@ -120,11 +122,13 @@ pub enum Command {
         cmd: SeriesCmd,
     },
     /// Sports & event milestones
+    #[command(alias = "milestones")]
     Milestone {
         #[command(subcommand)]
         cmd: MilestoneCmd,
     },
     /// Multivariate event collections (combo markets)
+    #[command(alias = "collections")]
     Collection {
         #[command(subcommand)]
         cmd: CollectionCmd,
@@ -132,21 +136,25 @@ pub enum Command {
 
     // ── Trading ──
     /// Orders (requires auth)
+    #[command(alias = "orders")]
     Order {
         #[command(subcommand)]
         cmd: OrderCmd,
     },
     /// Order groups / brackets (requires auth)
+    #[command(alias = "order-groups")]
     OrderGroup {
         #[command(subcommand)]
         cmd: OrderGroupCmd,
     },
     /// Request for quotes / block trades (requires auth)
+    #[command(alias = "rfqs")]
     Rfq {
         #[command(subcommand)]
         cmd: RfqCmd,
     },
     /// Quotes for RFQs (requires auth)
+    #[command(alias = "quotes")]
     Quote {
         #[command(subcommand)]
         cmd: QuoteCmd,
@@ -174,6 +182,7 @@ pub enum Command {
         cmd: AccountCmd,
     },
     /// Subaccounts (requires auth)
+    #[command(alias = "subaccounts")]
     Subaccount {
         #[command(subcommand)]
         cmd: SubaccountCmd,
@@ -186,6 +195,7 @@ pub enum Command {
         cmd: WatchCmd,
     },
     /// Price alerts
+    #[command(alias = "alerts")]
     Alert {
         #[command(subcommand)]
         cmd: AlertCmd,
@@ -211,6 +221,7 @@ pub enum Command {
         cmd: ConfigCmd,
     },
     /// API key management (requires auth)
+    #[command(alias = "api-keys")]
     ApiKey {
         #[command(subcommand)]
         cmd: ApiKeyCmd,
@@ -284,6 +295,7 @@ pub enum ExchangeCmd {
     /// Get exchange status
     Status,
     /// Get exchange announcements
+    #[command(alias = "announcements")]
     Announcement,
     /// Get exchange schedule
     Schedule,
@@ -320,6 +332,7 @@ pub enum MarketCmd {
         ticker: String,
     },
     /// Get market trades
+    #[command(alias = "trades")]
     Trade {
         #[arg(long)]
         ticker: Option<String>,
@@ -335,6 +348,7 @@ pub enum MarketCmd {
         max_ts: Option<i64>,
     },
     /// Get market candlesticks
+    #[command(alias = "candlesticks")]
     Candlestick {
         /// Market ticker
         ticker: String,
@@ -459,6 +473,7 @@ pub enum EventCmd {
         event_ticker: String,
     },
     /// List multivariate events
+    #[command(alias = "multivariates")]
     Multivariate {
         #[arg(long)]
         limit: Option<u32>,
@@ -472,6 +487,7 @@ pub enum EventCmd {
         with_nested_markets: bool,
     },
     /// Get event candlesticks
+    #[command(alias = "candlesticks")]
     Candlestick {
         /// Event ticker
         event_ticker: String,
@@ -719,6 +735,7 @@ pub enum PortfolioCmd {
     /// Get account balance
     Balance,
     /// Get open positions
+    #[command(alias = "positions")]
     Position {
         #[arg(long)]
         limit: Option<u32>,
@@ -736,6 +753,7 @@ pub enum PortfolioCmd {
         settlement_status: Option<String>,
     },
     /// Get trade fills
+    #[command(alias = "fills")]
     Fill {
         #[arg(long)]
         limit: Option<u32>,
@@ -753,6 +771,7 @@ pub enum PortfolioCmd {
         max_ts: Option<i64>,
     },
     /// Get settlement history
+    #[command(alias = "settlements")]
     Settlement {
         #[arg(long)]
         limit: Option<u32>,
@@ -774,6 +793,7 @@ pub enum PortfolioCmd {
 #[derive(Subcommand)]
 pub enum HistoricalCmd {
     /// List historical markets
+    #[command(alias = "markets")]
     Market {
         #[arg(long)]
         limit: Option<u32>,
@@ -789,6 +809,7 @@ pub enum HistoricalCmd {
         max_close_ts: Option<i64>,
     },
     /// List historical trades
+    #[command(alias = "trades")]
     Trade {
         #[arg(long)]
         limit: Option<u32>,
@@ -804,6 +825,7 @@ pub enum HistoricalCmd {
         max_ts: Option<i64>,
     },
     /// Get historical candlesticks
+    #[command(alias = "candlesticks")]
     Candlestick {
         /// Market ticker
         ticker: String,
@@ -821,6 +843,7 @@ pub enum HistoricalCmd {
     /// Get cutoff timestamps
     Cutoff,
     /// Get historical fills (requires auth)
+    #[command(alias = "fills")]
     Fill {
         #[arg(long)]
         limit: Option<u32>,
@@ -832,6 +855,7 @@ pub enum HistoricalCmd {
         ticker: Option<String>,
     },
     /// Get historical orders (requires auth)
+    #[command(alias = "orders")]
     Order {
         #[arg(long)]
         limit: Option<u32>,
@@ -874,6 +898,7 @@ pub enum SubaccountCmd {
     /// Get all subaccount balances
     Balance,
     /// List transfers
+    #[command(alias = "transfers")]
     TransferList {
         #[arg(long)]
         limit: Option<u32>,
@@ -1123,6 +1148,7 @@ pub enum IncentiveProgramCmd {
 #[derive(Subcommand)]
 pub enum FcmCmd {
     /// List FCM orders
+    #[command(alias = "orders")]
     Order {
         /// Subtrader ID (required)
         #[arg(long)]
@@ -1145,6 +1171,7 @@ pub enum FcmCmd {
         limit: Option<u32>,
     },
     /// List FCM positions
+    #[command(alias = "positions")]
     Position {
         /// Subtrader ID (required)
         #[arg(long)]
@@ -1230,6 +1257,7 @@ pub enum ExportFormat {
 #[derive(Subcommand)]
 pub enum ExportCmd {
     /// Export trade fills
+    #[command(alias = "fills")]
     Fill {
         /// Output format
         #[arg(long, default_value = "csv")]
@@ -1242,6 +1270,7 @@ pub enum ExportCmd {
         output: PathBuf,
     },
     /// Export positions
+    #[command(alias = "positions")]
     Position {
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
@@ -1249,6 +1278,7 @@ pub enum ExportCmd {
         output: PathBuf,
     },
     /// Export settlements
+    #[command(alias = "settlements")]
     Settlement {
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
@@ -1261,18 +1291,21 @@ pub enum ExportCmd {
 
 #[derive(Subcommand)]
 pub enum WatchCmd {
-    /// Watch live price updates for one or more markets
+    /// Watch live price updates for one or more markets (requires auth)
+    #[command(alias = "tickers")]
     Ticker {
         /// Market ticker(s)
         #[arg(required = true)]
         markets: Vec<String>,
     },
-    /// Watch live trades (optionally filtered to specific markets)
+    /// Watch live trades (optionally filtered to specific markets, requires auth)
+    #[command(alias = "trades")]
     Trade {
         /// Market ticker(s) (omit to watch all trades)
         markets: Vec<String>,
     },
-    /// Watch orderbook updates for one or more markets
+    /// Watch orderbook updates for one or more markets (requires auth)
+    #[command(alias = "orderbooks")]
     Orderbook {
         /// Market ticker(s)
         #[arg(required = true)]
@@ -1282,29 +1315,32 @@ pub enum WatchCmd {
         snapshot: bool,
     },
     /// Watch your fill notifications (requires auth)
+    #[command(alias = "fills")]
     Fill {
         /// Market ticker(s) (omit to watch all fills)
         markets: Vec<String>,
     },
     /// Watch your position updates (requires auth)
+    #[command(alias = "positions")]
     Position {
         /// Market ticker(s) (omit to watch all positions)
         markets: Vec<String>,
     },
     /// Watch your order status updates (requires auth)
-    Orders {
+    #[command(alias = "orders")]
+    Order {
         /// Market ticker(s) (omit to watch all orders)
         markets: Vec<String>,
     },
-    /// Watch market & event lifecycle changes (created, settled, etc.)
+    /// Watch market & event lifecycle changes (created, settled, etc., requires auth)
     Lifecycle,
     /// Watch RFQ and quote notifications (requires auth)
     Communications,
     /// Watch order group updates (requires auth)
     OrderGroupUpdates,
-    /// Watch multivariate market & event lifecycle changes
+    /// Watch multivariate market & event lifecycle changes (requires auth)
     MultivarLifecycle,
-    /// Watch multivariate collection lookups
+    /// Watch multivariate collection lookups (requires auth)
     Multivariate,
 }
 

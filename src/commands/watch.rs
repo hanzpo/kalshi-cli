@@ -15,7 +15,7 @@ pub async fn execute(ws: &KalshiWebSocket, cmd: WatchCmd, _out: &OutputConfig) -
         }
         WatchCmd::Fill { markets } => ("fill", markets.clone(), false),
         WatchCmd::Position { markets } => ("market_positions", markets.clone(), false),
-        WatchCmd::Orders { markets } => ("user_orders", markets.clone(), false),
+        WatchCmd::Order { markets } => ("user_orders", markets.clone(), false),
         WatchCmd::Lifecycle => ("market_lifecycle_v2", vec![], false),
         WatchCmd::Communications => ("communications", vec![], false),
         WatchCmd::OrderGroupUpdates => ("order_group_updates", vec![], false),
