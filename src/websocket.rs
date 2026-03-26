@@ -98,3 +98,72 @@ impl KalshiWebSocket {
         msg.to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_subscribe_msg_with_market_ticker() {
+        let msg = KalshiWebSocket::subscribe_msg(1, &["ticker"], Some("MARKET"));
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert_eq!(parsed["id"], 1);
+        assert_eq!(parsed["cmd"], "subscribe");
+        assert_eq!(parsed["params"]["channels"][0], "ticker");
+        assert_eq!(parsed["params"]["market_ticker"], "MARKET");
+    }
+
+    #[test]
+    fn test_subscribe_msg_without_market_ticker() {
+        let msg = KalshiWebSocket::subscribe_msg(2, &["ticker", "trade"], None);
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert_eq!(parsed["id"], 2);
+        assert_eq!(parsed["cmd"], "subscribe");
+        assert_eq!(parsed["params"]["channels"][0], "ticker");
+        assert_eq!(parsed["params"]["channels"][1], "trade");
+        assert!(parsed["params"]["market_ticker"].is_null());
+    }
+
+    #[test]
+    fn test_unsubscribe_msg_cmd() {
+        let msg = KalshiWebSocket::unsubscribe_msg(1, &["ticker"], Some("MARKET"));
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert_eq!(parsed["cmd"], "unsubscribe");
+        assert_eq!(parsed["params"]["market_ticker"], "MARKET");
+    }
+
+    #[test]
+    fn test_subscribe_msg_has_required_fields() {
+        let msg = KalshiWebSocket::subscribe_msg(5, &["orderbook"], Some("MKT-1"));
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert!(parsed.get("id").is_some());
+        assert!(parsed.get("cmd").is_some());
+        assert!(parsed.get("params").is_some());
+        assert!(parsed["params"].get("channels").is_some());
+    }
+
+    #[test]
+    fn test_market_ticker_absent_when_none() {
+        let msg = KalshiWebSocket::subscribe_msg(1, &["ticker"], None);
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        // The key should not exist in the JSON object
+        assert!(parsed["params"].as_object().unwrap().get("market_ticker").is_none());
+    }
+
+    #[test]
+    fn test_unsubscribe_msg_without_market_ticker() {
+        let msg = KalshiWebSocket::unsubscribe_msg(3, &["trade"], None);
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        assert_eq!(parsed["cmd"], "unsubscribe");
+        assert_eq!(parsed["id"], 3);
+        assert!(parsed["params"].as_object().unwrap().get("market_ticker").is_none());
+    }
+
+    #[test]
+    fn test_subscribe_msg_multiple_channels() {
+        let msg = KalshiWebSocket::subscribe_msg(10, &["ticker", "trade", "orderbook"], Some("X"));
+        let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
+        let channels = parsed["params"]["channels"].as_array().unwrap();
+        assert_eq!(channels.len(), 3);
+    }
+}

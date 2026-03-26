@@ -52,3 +52,107 @@ impl TableDisplay for Event {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn full_event() -> Event {
+        Event {
+            event_ticker: Some("EVT-1".to_string()),
+            series_ticker: Some("SER-1".to_string()),
+            title: Some("Will it rain?".to_string()),
+            category: Some("weather".to_string()),
+            status: Some("open".to_string()),
+            mutually_exclusive: Some(true),
+            strike_date: Some("2025-06-15".to_string()),
+            extra: Default::default(),
+        }
+    }
+
+    #[test]
+    fn headers_returns_five_columns() {
+        let h = Event::headers();
+        assert_eq!(h, vec!["Event Ticker", "Series", "Title", "Category", "Status"]);
+    }
+
+    #[test]
+    fn row_all_some() {
+        let e = full_event();
+        let row = e.row();
+        assert_eq!(row[0], "EVT-1");
+        assert_eq!(row[1], "SER-1");
+        assert_eq!(row[2], "Will it rain?");
+        assert_eq!(row[3], "weather");
+        assert_eq!(row[4], "open");
+    }
+
+    #[test]
+    fn row_all_none() {
+        let e = Event {
+            event_ticker: None,
+            series_ticker: None,
+            title: None,
+            category: None,
+            status: None,
+            mutually_exclusive: None,
+            strike_date: None,
+            extra: Default::default(),
+        };
+        let row = e.row();
+        for field in &row {
+            assert_eq!(field, "-");
+        }
+    }
+
+    #[test]
+    fn row_truncates_long_title() {
+        let long_title = "A".repeat(60); // 60 chars > 50
+        let e = Event {
+            event_ticker: Some("EVT-2".to_string()),
+            series_ticker: None,
+            title: Some(long_title),
+            category: None,
+            status: None,
+            mutually_exclusive: None,
+            strike_date: None,
+            extra: Default::default(),
+        };
+        let row = e.row();
+        assert_eq!(row[2].len(), 50); // 47 chars + "..."
+        assert!(row[2].ends_with("..."));
+    }
+
+    #[test]
+    fn row_does_not_truncate_short_title() {
+        let short_title = "Short title".to_string();
+        let e = Event {
+            event_ticker: None,
+            series_ticker: None,
+            title: Some(short_title.clone()),
+            category: None,
+            status: None,
+            mutually_exclusive: None,
+            strike_date: None,
+            extra: Default::default(),
+        };
+        let row = e.row();
+        assert_eq!(row[2], short_title);
+    }
+
+    #[test]
+    fn row_title_exactly_50_chars_no_truncation() {
+        let title = "A".repeat(50);
+        let e = Event {
+            event_ticker: None,
+            series_ticker: None,
+            title: Some(title.clone()),
+            category: None,
+            status: None,
+            mutually_exclusive: None,
+            strike_date: None,
+            extra: Default::default(),
+        };
+        let row = e.row();
+        assert_eq!(row[2], title);
+    }
+}

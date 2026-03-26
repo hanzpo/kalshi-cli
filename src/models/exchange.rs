@@ -43,3 +43,55 @@ pub struct ScheduleResponse {
 pub struct Schedule {
     pub standard_hours: Option<serde_json::Value>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn headers_returns_two_columns() {
+        let h = ExchangeStatus::headers();
+        assert_eq!(h, vec!["Exchange Active", "Trading Active"]);
+    }
+
+    #[test]
+    fn row_with_some_true() {
+        let s = ExchangeStatus {
+            exchange_active: Some(true),
+            trading_active: Some(true),
+        };
+        let row = s.row();
+        assert_eq!(row, vec!["true", "true"]);
+    }
+
+    #[test]
+    fn row_with_some_false() {
+        let s = ExchangeStatus {
+            exchange_active: Some(false),
+            trading_active: Some(false),
+        };
+        let row = s.row();
+        assert_eq!(row, vec!["false", "false"]);
+    }
+
+    #[test]
+    fn row_with_none_values() {
+        let s = ExchangeStatus {
+            exchange_active: None,
+            trading_active: None,
+        };
+        let row = s.row();
+        assert_eq!(row, vec!["-", "-"]);
+    }
+
+    #[test]
+    fn row_mixed_values() {
+        let s = ExchangeStatus {
+            exchange_active: Some(true),
+            trading_active: None,
+        };
+        let row = s.row();
+        assert_eq!(row[0], "true");
+        assert_eq!(row[1], "-");
+    }
+}

@@ -62,3 +62,102 @@ pub fn format_opt<T: std::fmt::Display>(val: &Option<T>) -> String {
         None => "-".to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_opt_some_i32() {
+        assert_eq!(format_opt(&Some(42)), "42");
+    }
+
+    #[test]
+    fn test_format_opt_none_i32() {
+        assert_eq!(format_opt(&None::<i32>), "-");
+    }
+
+    #[test]
+    fn test_format_opt_some_string() {
+        assert_eq!(format_opt(&Some("hello")), "hello");
+    }
+
+    #[test]
+    fn test_format_opt_some_float() {
+        assert_eq!(format_opt(&Some(3.14)), "3.14");
+    }
+
+    #[test]
+    fn test_format_opt_none_string() {
+        assert_eq!(format_opt(&None::<String>), "-");
+    }
+
+    #[test]
+    fn test_format_opt_some_zero() {
+        assert_eq!(format_opt(&Some(0)), "0");
+    }
+
+    #[test]
+    fn test_format_opt_some_empty_string() {
+        assert_eq!(format_opt(&Some("")), "");
+    }
+
+    #[test]
+    fn test_side_display_yes() {
+        assert_eq!(format!("{}", Side::Yes), "yes");
+    }
+
+    #[test]
+    fn test_side_display_no() {
+        assert_eq!(format!("{}", Side::No), "no");
+    }
+
+    #[test]
+    fn test_action_display_buy() {
+        assert_eq!(format!("{}", Action::Buy), "buy");
+    }
+
+    #[test]
+    fn test_action_display_sell() {
+        assert_eq!(format!("{}", Action::Sell), "sell");
+    }
+
+    #[test]
+    fn test_time_in_force_display_gtc() {
+        assert_eq!(format!("{}", TimeInForce::GoodTillCanceled), "gtc");
+    }
+
+    #[test]
+    fn test_time_in_force_display_fok() {
+        assert_eq!(format!("{}", TimeInForce::FillOrKill), "fok");
+    }
+
+    #[test]
+    fn test_time_in_force_display_ioc() {
+        assert_eq!(format!("{}", TimeInForce::ImmediateOrCancel), "ioc");
+    }
+
+    #[test]
+    fn test_side_serde_roundtrip() {
+        let json = serde_json::to_string(&Side::Yes).unwrap();
+        assert_eq!(json, "\"yes\"");
+        let deserialized: Side = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{}", deserialized), "yes");
+    }
+
+    #[test]
+    fn test_action_serde_roundtrip() {
+        let json = serde_json::to_string(&Action::Sell).unwrap();
+        assert_eq!(json, "\"sell\"");
+        let deserialized: Action = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{}", deserialized), "sell");
+    }
+
+    #[test]
+    fn test_time_in_force_serde_roundtrip() {
+        let json = serde_json::to_string(&TimeInForce::FillOrKill).unwrap();
+        assert_eq!(json, "\"fok\"");
+        let deserialized: TimeInForce = serde_json::from_str(&json).unwrap();
+        assert_eq!(format!("{}", deserialized), "fok");
+    }
+}

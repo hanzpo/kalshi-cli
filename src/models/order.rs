@@ -141,3 +141,178 @@ impl TableDisplay for Order {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_order() -> Order {
+        Order {
+            order_id: Some("abcdef123456789".to_string()),
+            ticker: Some("MKT-1".to_string()),
+            status: Some("resting".to_string()),
+            side: Some("yes".to_string()),
+            action: Some("buy".to_string()),
+            yes_price: Some(65),
+            no_price: Some(35),
+            count: Some(10),
+            remaining_count: Some(5),
+            created_time: Some("2026-01-01T00:00:00Z".to_string()),
+            updated_time: None,
+            expiration_time: None,
+            client_order_id: None,
+            order_type: None,
+            queue_position: None,
+            extra: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_order_headers_count() {
+        let headers = Order::headers();
+        assert_eq!(headers.len(), 10);
+    }
+
+    #[test]
+    fn test_order_headers_values() {
+        let headers = Order::headers();
+        assert_eq!(headers[0], "Order ID");
+        assert_eq!(headers[9], "Created");
+    }
+
+    #[test]
+    fn test_order_row_truncates_long_id() {
+        let order = make_order();
+        let row = order.row();
+        assert_eq!(row[0], "abcdef123456...");
+        assert_eq!(row[0].len(), 15); // 12 + "..."
+    }
+
+    #[test]
+    fn test_order_row_short_id_no_truncation() {
+        let mut order = make_order();
+        order.order_id = Some("short-id".to_string());
+        let row = order.row();
+        assert_eq!(row[0], "short-id");
+    }
+
+    #[test]
+    fn test_order_row_exactly_12_char_id() {
+        let mut order = make_order();
+        order.order_id = Some("123456789012".to_string());
+        let row = order.row();
+        assert_eq!(row[0], "123456789012");
+    }
+
+    #[test]
+    fn test_order_row_none_id() {
+        let mut order = make_order();
+        order.order_id = None;
+        let row = order.row();
+        assert_eq!(row[0], "-");
+    }
+
+    #[test]
+    fn test_order_row_all_none() {
+        let order = Order {
+            order_id: None,
+            ticker: None,
+            status: None,
+            side: None,
+            action: None,
+            yes_price: None,
+            no_price: None,
+            count: None,
+            remaining_count: None,
+            created_time: None,
+            updated_time: None,
+            expiration_time: None,
+            client_order_id: None,
+            order_type: None,
+            queue_position: None,
+            extra: std::collections::HashMap::new(),
+        };
+        let row = order.row();
+        for cell in &row {
+            assert_eq!(cell, "-");
+        }
+    }
+
+    #[test]
+    fn test_create_order_request_skip_serializing_none() {
+        let req = CreateOrderRequest {
+            ticker: "MKT-1".to_string(),
+            side: "yes".to_string(),
+            action: "buy".to_string(),
+            count: Some(5),
+            yes_price: Some(65),
+            no_price: None,
+            time_in_force: None,
+            expiration_ts: None,
+            client_order_id: None,
+            post_only: None,
+            reduce_only: None,
+            buy_max_cost: None,
+            order_group_id: None,
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert!(json.get("no_price").is_none());
+        assert!(json.get("type").is_none());
+        assert!(json.get("expiration_ts").is_none());
+        assert!(json.get("client_order_id").is_none());
+        assert!(json.get("post_only").is_none());
+        assert!(json.get("reduce_only").is_none());
+        assert!(json.get("buy_max_cost").is_none());
+        assert!(json.get("order_group_id").is_none());
+        // Present fields
+        assert_eq!(json["ticker"], "MKT-1");
+        assert_eq!(json["count"], 5);
+        assert_eq!(json["yes_price"], 65);
+    }
+
+    #[test]
+    fn test_create_order_request_with_all_fields() {
+        let req = CreateOrderRequest {
+            ticker: "MKT-1".to_string(),
+            side: "yes".to_string(),
+            action: "buy".to_string(),
+            count: Some(5),
+            yes_price: Some(65),
+            no_price: Some(35),
+            time_in_force: Some("gtc".to_string()),
+            expiration_ts: Some(1700000000),
+            client_order_id: Some("client-1".to_string()),
+            post_only: Some(true),
+            reduce_only: Some(false),
+            buy_max_cost: Some(1000),
+            order_group_id: Some("group-1".to_string()),
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["no_price"], 35);
+        assert_eq!(json["type"], "gtc");
+        assert_eq!(json["post_only"], true);
+    }
+
+    #[test]
+    fn test_batch_cancel_request_serialization() {
+        let req = BatchCancelRequest {
+            ticker: Some("MKT-1".to_string()),
+            order_ids: None,
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["ticker"], "MKT-1");
+        assert!(json.get("order_ids").is_none());
+    }
+
+    #[test]
+    fn test_batch_cancel_request_with_order_ids() {
+        let req = BatchCancelRequest {
+            ticker: None,
+            order_ids: Some(vec!["o1".to_string(), "o2".to_string()]),
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert!(json.get("ticker").is_none());
+        let ids = json["order_ids"].as_array().unwrap();
+        assert_eq!(ids.len(), 2);
+    }
+}

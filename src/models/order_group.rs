@@ -50,3 +50,56 @@ impl TableDisplay for OrderGroup {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn headers_returns_four_columns() {
+        let h = OrderGroup::headers();
+        assert_eq!(h, vec!["ID", "Status", "Max Loss", "Created"]);
+    }
+
+    #[test]
+    fn row_all_some() {
+        let og = OrderGroup {
+            id: Some("og-1".to_string()),
+            status: Some("active".to_string()),
+            max_loss: Some(500),
+            created_time: Some("2025-01-15T10:30:00Z".to_string()),
+            extra: Default::default(),
+        };
+        let row = og.row();
+        assert_eq!(row, vec!["og-1", "active", "500", "2025-01-15T10:30:00Z"]);
+    }
+
+    #[test]
+    fn row_all_none() {
+        let og = OrderGroup {
+            id: None,
+            status: None,
+            max_loss: None,
+            created_time: None,
+            extra: Default::default(),
+        };
+        let row = og.row();
+        assert_eq!(row, vec!["-", "-", "-", "-"]);
+    }
+
+    #[test]
+    fn row_partial_fields() {
+        let og = OrderGroup {
+            id: Some("og-2".to_string()),
+            status: None,
+            max_loss: Some(1000),
+            created_time: None,
+            extra: Default::default(),
+        };
+        let row = og.row();
+        assert_eq!(row[0], "og-2");
+        assert_eq!(row[1], "-");
+        assert_eq!(row[2], "1000");
+        assert_eq!(row[3], "-");
+    }
+}

@@ -54,6 +54,14 @@ impl KalshiClient {
         })
     }
 
+    pub(crate) fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    pub(crate) fn has_auth(&self) -> bool {
+        self.signer.is_some()
+    }
+
     pub fn require_auth(&self) -> Result<()> {
         if self.signer.is_none() {
             bail!(KalshiError::AuthRequired);
@@ -223,5 +231,72 @@ impl KalshiClient {
                 code: None,
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    fn empty_config() -> Config {
+        Config {
+            api_key_id: None,
+            private_key_path: None,
+            default_output: None,
+            demo: None,
+            profiles: Default::default(),
+        }
+    }
+
+    #[test]
+    fn prod_base_url_value() {
+        assert_eq!(PROD_BASE_URL, "https://api.elections.kalshi.com/trade-api/v2");
+    }
+
+    #[test]
+    fn demo_base_url_value() {
+        assert_eq!(DEMO_BASE_URL, "https://demo-api.kalshi.co/trade-api/v2");
+    }
+
+    #[test]
+    fn new_with_demo_true_uses_demo_url() {
+        let client = KalshiClient::new(&empty_config(), true).unwrap();
+        assert_eq!(client.base_url(), DEMO_BASE_URL);
+    }
+
+    #[test]
+    fn new_with_demo_false_uses_prod_url() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        assert_eq!(client.base_url(), PROD_BASE_URL);
+    }
+
+    #[test]
+    fn new_with_empty_config_has_no_auth() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        assert!(!client.has_auth());
+    }
+
+    #[test]
+    fn require_auth_without_signer_returns_error() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let result = client.require_auth();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn url_construction_concatenates_base_and_path() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let expected = format!("{}/markets", PROD_BASE_URL);
+        let actual = format!("{}{}", client.base_url(), "/markets");
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn url_construction_demo_with_path() {
+        let client = KalshiClient::new(&empty_config(), true).unwrap();
+        let expected = format!("{}/markets/ABC-123/orderbook", DEMO_BASE_URL);
+        let actual = format!("{}{}", client.base_url(), "/markets/ABC-123/orderbook");
+        assert_eq!(actual, expected);
     }
 }

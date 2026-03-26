@@ -411,7 +411,7 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
     Ok(())
 }
 
-fn simulate_fill(levels: &[(f64, i64)], mut qty: i64, buying: bool) -> f64 {
+pub(crate) fn simulate_fill(levels: &[(f64, i64)], mut qty: i64, buying: bool) -> f64 {
     let mut total_cost = 0.0;
     // For buying, walk the ask side (ascending price); for selling, walk the bid side (descending)
     let iter: Box<dyn Iterator<Item = &(f64, i64)>> = if buying {
@@ -428,4 +428,118 @@ fn simulate_fill(levels: &[(f64, i64)], mut qty: i64, buying: bool) -> f64 {
         qty -= fill;
     }
     total_cost
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── simulate_fill tests ──
+
+    #[test]
+    fn simulate_fill_buy_across_multiple_levels() {
+        let levels = vec![(10.0, 5), (20.0, 10), (30.0, 5)];
+        // Buy 8: fills 5@10 + 3@20 = 50 + 60 = 110
+        let cost = simulate_fill(&levels, 8, true);
+        assert!((cost - 110.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_buy_empty_levels() {
+        let levels: Vec<(f64, i64)> = vec![];
+        let cost = simulate_fill(&levels, 10, true);
+        assert!((cost - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_buy_more_than_available() {
+        let levels = vec![(10.0, 3), (20.0, 2)];
+        // Want 10, only 5 available: 3@10 + 2@20 = 30 + 40 = 70
+        let cost = simulate_fill(&levels, 10, true);
+        assert!((cost - 70.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_sell_reverses_order() {
+        let levels = vec![(10.0, 5), (20.0, 10), (30.0, 5)];
+        // Sell 8: walks from end → 5@30 + 3@20 = 150 + 60 = 210
+        let proceeds = simulate_fill(&levels, 8, false);
+        assert!((proceeds - 210.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_buy_exactly_one_level() {
+        let levels = vec![(15.0, 7), (25.0, 3)];
+        // Buy exactly 7 → fills entire first level: 7@15 = 105
+        let cost = simulate_fill(&levels, 7, true);
+        assert!((cost - 105.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_single_level_partial() {
+        let levels = vec![(42.0, 100)];
+        // Buy 10 from single level: 10@42 = 420
+        let cost = simulate_fill(&levels, 10, true);
+        assert!((cost - 420.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_zero_quantity() {
+        let levels = vec![(10.0, 5)];
+        let cost = simulate_fill(&levels, 0, true);
+        assert!((cost - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn simulate_fill_sell_empty_levels() {
+        let levels: Vec<(f64, i64)> = vec![];
+        let proceeds = simulate_fill(&levels, 5, false);
+        assert!((proceeds - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── build_market_query tests ──
+
+    #[test]
+    fn build_market_query_all_none() {
+        let query = build_market_query(100, None, &None, &None, &None);
+        assert_eq!(query.len(), 1);
+        assert_eq!(query[0], ("limit".to_string(), "100".to_string()));
+    }
+
+    #[test]
+    fn build_market_query_with_cursor() {
+        let query = build_market_query(50, Some("abc123".to_string()), &None, &None, &None);
+        assert_eq!(query.len(), 2);
+        assert_eq!(query[1], ("cursor".to_string(), "abc123".to_string()));
+    }
+
+    #[test]
+    fn build_market_query_with_all_params() {
+        let status = Some("open".to_string());
+        let series = Some("SER-1".to_string());
+        let event = Some("EVT-1".to_string());
+        let query = build_market_query(25, Some("cur".to_string()), &status, &series, &event);
+        assert_eq!(query.len(), 5);
+        assert_eq!(query[0].0, "limit");
+        assert_eq!(query[1], ("cursor".to_string(), "cur".to_string()));
+        assert_eq!(query[2], ("status".to_string(), "open".to_string()));
+        assert_eq!(query[3], ("series_ticker".to_string(), "SER-1".to_string()));
+        assert_eq!(query[4], ("event_ticker".to_string(), "EVT-1".to_string()));
+    }
+
+    #[test]
+    fn build_market_query_with_status_only() {
+        let status = Some("closed".to_string());
+        let query = build_market_query(10, None, &status, &None, &None);
+        assert_eq!(query.len(), 2);
+        assert_eq!(query[1], ("status".to_string(), "closed".to_string()));
+    }
+
+    #[test]
+    fn build_market_query_with_event_ticker_only() {
+        let event = Some("EVT-ABC".to_string());
+        let query = build_market_query(10, None, &None, &None, &event);
+        assert_eq!(query.len(), 2);
+        assert_eq!(query[1], ("event_ticker".to_string(), "EVT-ABC".to_string()));
+    }
 }

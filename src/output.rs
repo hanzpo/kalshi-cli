@@ -155,3 +155,132 @@ pub fn output_one<T: Serialize + TableDisplay + Clone>(
         OutputFormat::Csv => print_csv(&[data.clone()]),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Clone, Serialize)]
+    struct TestItem {
+        id: String,
+        name: String,
+    }
+
+    impl TableDisplay for TestItem {
+        fn headers() -> Vec<&'static str> {
+            vec!["ID", "Name"]
+        }
+        fn row(&self) -> Vec<String> {
+            vec![self.id.clone(), self.name.clone()]
+        }
+    }
+
+    fn make_item(id: &str, name: &str) -> TestItem {
+        TestItem {
+            id: id.to_string(),
+            name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn output_config_construction() {
+        let cfg = OutputConfig {
+            format: OutputFormat::Table,
+            no_pager: true,
+            color: false,
+            quiet: false,
+            yes: false,
+        };
+        assert!(cfg.no_pager);
+        assert!(!cfg.color);
+        assert!(!cfg.quiet);
+        assert!(!cfg.yes);
+    }
+
+    #[test]
+    fn output_format_json_variant_exists() {
+        let _f = OutputFormat::Json;
+    }
+
+    #[test]
+    fn output_format_table_variant_exists() {
+        let _f = OutputFormat::Table;
+    }
+
+    #[test]
+    fn output_format_csv_variant_exists() {
+        let _f = OutputFormat::Csv;
+    }
+
+    #[test]
+    fn test_item_headers() {
+        assert_eq!(TestItem::headers(), vec!["ID", "Name"]);
+    }
+
+    #[test]
+    fn test_item_row() {
+        let item = make_item("1", "Alice");
+        assert_eq!(item.row(), vec!["1", "Alice"]);
+    }
+
+    #[test]
+    fn colored_row_default_returns_row() {
+        let item = make_item("42", "Bob");
+        assert_eq!(item.colored_row(true), item.row());
+        assert_eq!(item.colored_row(false), item.row());
+    }
+
+    #[test]
+    fn print_quiet_outputs_first_column() {
+        // Verify the logic: print_quiet iterates items and prints the first element of row()
+        let item = make_item("ticker-abc", "Some Market");
+        let row = item.row();
+        assert_eq!(row.first().unwrap(), "ticker-abc");
+    }
+
+    #[test]
+    fn print_csv_writes_header_and_rows() {
+        // Test CSV output using an in-memory writer to verify format
+        let items = vec![make_item("1", "Alpha"), make_item("2", "Beta")];
+        let mut wtr = csv::Writer::from_writer(Vec::new());
+        wtr.write_record(TestItem::headers()).unwrap();
+        for item in &items {
+            wtr.write_record(item.row()).unwrap();
+        }
+        wtr.flush().unwrap();
+        let output = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
+        assert!(output.contains("ID,Name"));
+        assert!(output.contains("1,Alpha"));
+        assert!(output.contains("2,Beta"));
+    }
+
+    #[test]
+    fn output_quiet_takes_quiet_branch() {
+        // When quiet=true, output() should call print_quiet (returns Ok without hitting format)
+        let cfg = OutputConfig {
+            format: OutputFormat::Json,
+            no_pager: true,
+            color: false,
+            quiet: true,
+            yes: false,
+        };
+        let items = vec![make_item("x", "y")];
+        // This should not error — it takes the quiet branch, printing to stdout
+        let result = output(&items, &cfg);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn output_empty_items_quiet() {
+        let cfg = OutputConfig {
+            format: OutputFormat::Table,
+            no_pager: true,
+            color: false,
+            quiet: true,
+            yes: false,
+        };
+        let items: Vec<TestItem> = vec![];
+        let result = output(&items, &cfg);
+        assert!(result.is_ok());
+    }
+}

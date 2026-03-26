@@ -89,3 +89,173 @@ impl Config {
             .join(".kalshi")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_config_default_has_none_fields() {
+        let config = Config::default();
+        assert!(config.api_key_id.is_none());
+        assert!(config.private_key_path.is_none());
+        assert!(config.default_output.is_none());
+        assert!(config.demo.is_none());
+        assert!(config.profiles.is_empty());
+    }
+
+    #[test]
+    fn test_config_resolve_no_profile() {
+        // Unset KALSHI_PROFILE to avoid interference
+        unsafe { std::env::remove_var("KALSHI_PROFILE"); }
+        let config = Config {
+            api_key_id: Some("key123".to_string()),
+            ..Config::default()
+        };
+        let resolved = config.resolve(None).unwrap();
+        assert_eq!(resolved.api_key_id, Some("key123".to_string()));
+    }
+
+    #[test]
+    fn test_config_resolve_valid_profile() {
+        let mut profiles = HashMap::new();
+        profiles.insert(
+            "test".to_string(),
+            Profile {
+                api_key_id: Some("profile_key".to_string()),
+                private_key_path: Some("/path/to/key".to_string()),
+                demo: Some(true),
+            },
+        );
+        let config = Config {
+            api_key_id: Some("base_key".to_string()),
+            private_key_path: Some("/base/path".to_string()),
+            demo: Some(false),
+            profiles,
+            ..Config::default()
+        };
+        let resolved = config.resolve(Some("test")).unwrap();
+        assert_eq!(resolved.api_key_id, Some("profile_key".to_string()));
+        assert_eq!(resolved.private_key_path, Some("/path/to/key".to_string()));
+        assert_eq!(resolved.demo, Some(true));
+    }
+
+    #[test]
+    fn test_config_resolve_unknown_profile() {
+        let config = Config::default();
+        let result = config.resolve(Some("nonexistent"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_profile_overlay_partial() {
+        let mut profiles = HashMap::new();
+        profiles.insert(
+            "partial".to_string(),
+            Profile {
+                api_key_id: Some("override_key".to_string()),
+                private_key_path: None,
+                demo: None,
+            },
+        );
+        let config = Config {
+            api_key_id: Some("base_key".to_string()),
+            private_key_path: Some("/base/path".to_string()),
+            demo: Some(false),
+            profiles,
+            ..Config::default()
+        };
+        let resolved = config.resolve(Some("partial")).unwrap();
+        assert_eq!(resolved.api_key_id, Some("override_key".to_string()));
+        assert_eq!(resolved.private_key_path, Some("/base/path".to_string()));
+        assert_eq!(resolved.demo, Some(false));
+    }
+
+    #[test]
+    fn test_config_save_load_roundtrip() {
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path().to_path_buf();
+
+        let mut profiles = HashMap::new();
+        profiles.insert(
+            "demo".to_string(),
+            Profile {
+                api_key_id: Some("demo_key".to_string()),
+                private_key_path: None,
+                demo: Some(true),
+            },
+        );
+        let config = Config {
+            api_key_id: Some("my_key".to_string()),
+            private_key_path: Some("/keys/private.pem".to_string()),
+            default_output: Some("json".to_string()),
+            demo: Some(false),
+            profiles,
+        };
+        config.save(Some(&path)).unwrap();
+
+        // Unset env vars that would override loaded config
+        unsafe {
+            std::env::remove_var("KALSHI_API_KEY_ID");
+            std::env::remove_var("KALSHI_PRIVATE_KEY_PATH");
+        }
+
+        let loaded = Config::load(Some(&path)).unwrap();
+        assert_eq!(loaded.api_key_id, Some("my_key".to_string()));
+        assert_eq!(loaded.private_key_path, Some("/keys/private.pem".to_string()));
+        assert_eq!(loaded.default_output, Some("json".to_string()));
+        assert_eq!(loaded.demo, Some(false));
+        assert!(loaded.profiles.contains_key("demo"));
+        let demo_profile = loaded.profiles.get("demo").unwrap();
+        assert_eq!(demo_profile.api_key_id, Some("demo_key".to_string()));
+        assert!(demo_profile.private_key_path.is_none());
+        assert_eq!(demo_profile.demo, Some(true));
+    }
+
+    #[test]
+    fn test_config_load_nonexistent_returns_default() {
+        let path = std::path::PathBuf::from("/tmp/kalshi_test_nonexistent_config.toml");
+        // make sure it doesn't exist
+        let _ = std::fs::remove_file(&path);
+        let config = Config::load(Some(&path)).unwrap();
+        assert!(config.api_key_id.is_none());
+        assert!(config.profiles.is_empty());
+    }
+
+    #[test]
+    fn test_toml_parsing_with_profile_section() {
+        let toml_str = r#"
+api_key_id = "root_key"
+private_key_path = "/root/key.pem"
+
+[profiles.test]
+api_key_id = "test_key"
+demo = true
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.api_key_id, Some("root_key".to_string()));
+        assert_eq!(config.private_key_path, Some("/root/key.pem".to_string()));
+        let profile = config.profiles.get("test").unwrap();
+        assert_eq!(profile.api_key_id, Some("test_key".to_string()));
+        assert_eq!(profile.demo, Some(true));
+        assert!(profile.private_key_path.is_none());
+    }
+
+    #[test]
+    fn test_toml_parsing_empty_config() {
+        let config: Config = toml::from_str("").unwrap();
+        assert!(config.api_key_id.is_none());
+        assert!(config.profiles.is_empty());
+    }
+
+    #[test]
+    fn test_config_save_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("subdir").join("config.toml");
+        let config = Config::default();
+        config.save(Some(&path)).unwrap();
+        assert!(path.exists());
+    }
+}

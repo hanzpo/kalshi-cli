@@ -175,3 +175,219 @@ impl TableDisplay for Candlestick {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_market(title: Option<&str>) -> Market {
+        Market {
+            ticker: Some("TICKER-1".to_string()),
+            event_ticker: Some("EVT-1".to_string()),
+            title: title.map(|s| s.to_string()),
+            status: Some("open".to_string()),
+            yes_bid: Some(0.65),
+            yes_ask: Some(0.70),
+            no_bid: None,
+            no_ask: None,
+            last_price: Some(0.67),
+            volume: Some(1000),
+            volume_24h: None,
+            open_interest: Some(500),
+            result: None,
+            subtitle: None,
+            open_time: None,
+            close_time: None,
+            yes_sub_title: None,
+            no_sub_title: None,
+            market_type: None,
+            response_price_units: None,
+            notional_value: None,
+            tick_size: None,
+            rules_primary: None,
+            rules_secondary: None,
+            settlement_timer_seconds: None,
+            cap_strike: None,
+            floor_strike: None,
+            expected_expiration_time: None,
+            expiration_time: None,
+            settlement_value: None,
+            category: None,
+            risk_limit_cents: None,
+            strike_type: None,
+            custom_strike: None,
+            functional_strike: None,
+            can_close_early: None,
+            extra: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_market_headers() {
+        let headers = Market::headers();
+        assert_eq!(
+            headers,
+            vec!["Ticker", "Title", "Status", "Yes Bid", "Yes Ask", "Last Price", "Volume", "Open Int"]
+        );
+    }
+
+    #[test]
+    fn test_market_row_basic() {
+        let market = make_market(Some("Will it rain tomorrow?"));
+        let row = market.row();
+        assert_eq!(row[0], "TICKER-1");
+        assert_eq!(row[1], "Will it rain tomorrow?");
+        assert_eq!(row[2], "open");
+        assert_eq!(row[3], "0.65");
+        assert_eq!(row[4], "0.70");
+        assert_eq!(row[5], "0.67");
+        assert_eq!(row[6], "1000");
+        assert_eq!(row[7], "500");
+    }
+
+    #[test]
+    fn test_market_row_none_fields() {
+        let mut market = make_market(None);
+        market.ticker = None;
+        market.yes_bid = None;
+        market.yes_ask = None;
+        market.last_price = None;
+        market.volume = None;
+        market.open_interest = None;
+        market.status = None;
+        let row = market.row();
+        assert_eq!(row[0], "-"); // ticker
+        assert_eq!(row[1], "-"); // title
+        assert_eq!(row[2], "-"); // status
+        assert_eq!(row[3], "-"); // yes_bid
+        assert_eq!(row[4], "-"); // yes_ask
+        assert_eq!(row[5], "-"); // last_price
+        assert_eq!(row[6], "-"); // volume
+        assert_eq!(row[7], "-"); // open_interest
+    }
+
+    #[test]
+    fn test_market_title_truncation() {
+        let long_title = "A".repeat(60);
+        let market = make_market(Some(&long_title));
+        let row = market.row();
+        assert!(row[1].ends_with("..."));
+        assert_eq!(row[1].chars().count(), 50); // 47 chars + "..."
+    }
+
+    #[test]
+    fn test_market_title_exactly_50_chars() {
+        let title = "A".repeat(50);
+        let market = make_market(Some(&title));
+        let row = market.row();
+        assert_eq!(row[1], title);
+        assert!(!row[1].ends_with("..."));
+    }
+
+    #[test]
+    fn test_market_title_49_chars_no_truncation() {
+        let title = "A".repeat(49);
+        let market = make_market(Some(&title));
+        let row = market.row();
+        assert_eq!(row[1], title);
+    }
+
+    #[test]
+    fn test_trade_headers() {
+        let headers = Trade::headers();
+        assert_eq!(headers, vec!["Trade ID", "Ticker", "Count", "Yes Price", "No Price", "Taker Side", "Time"]);
+    }
+
+    #[test]
+    fn test_trade_row() {
+        let trade = Trade {
+            ticker: Some("T1".to_string()),
+            trade_id: Some("trade-123".to_string()),
+            count: Some(10),
+            yes_price: Some(0.55),
+            no_price: Some(0.45),
+            taker_side: Some("yes".to_string()),
+            created_time: Some("2026-01-01".to_string()),
+        };
+        let row = trade.row();
+        assert_eq!(row[0], "trade-123");
+        assert_eq!(row[1], "T1");
+        assert_eq!(row[2], "10");
+        assert_eq!(row[3], "0.55");
+        assert_eq!(row[4], "0.45");
+        assert_eq!(row[5], "yes");
+        assert_eq!(row[6], "2026-01-01");
+    }
+
+    #[test]
+    fn test_trade_row_none_fields() {
+        let trade = Trade {
+            ticker: None,
+            trade_id: None,
+            count: None,
+            yes_price: None,
+            no_price: None,
+            taker_side: None,
+            created_time: None,
+        };
+        let row = trade.row();
+        for cell in &row {
+            assert_eq!(cell, "-");
+        }
+    }
+
+    #[test]
+    fn test_candlestick_headers() {
+        let headers = Candlestick::headers();
+        assert_eq!(headers, vec!["Start", "Open", "High", "Low", "Close", "Volume"]);
+    }
+
+    #[test]
+    fn test_candlestick_row() {
+        let candle = Candlestick {
+            ticker: Some("C1".to_string()),
+            period: Some("1h".to_string()),
+            open: Some(0.50),
+            high: Some(0.80),
+            low: Some(0.40),
+            close: Some(0.75),
+            volume: Some(200),
+            open_interest: None,
+            start_period_ts: Some(1700000000),
+            end_period_ts: None,
+            yes_price: None,
+            yes_bid: None,
+            yes_ask: None,
+        };
+        let row = candle.row();
+        assert_eq!(row[0], "1700000000");
+        assert_eq!(row[1], "0.50");
+        assert_eq!(row[2], "0.80");
+        assert_eq!(row[3], "0.40");
+        assert_eq!(row[4], "0.75");
+        assert_eq!(row[5], "200");
+    }
+
+    #[test]
+    fn test_candlestick_row_none_fields() {
+        let candle = Candlestick {
+            ticker: None,
+            period: None,
+            open: None,
+            high: None,
+            low: None,
+            close: None,
+            volume: None,
+            open_interest: None,
+            start_period_ts: None,
+            end_period_ts: None,
+            yes_price: None,
+            yes_bid: None,
+            yes_ask: None,
+        };
+        let row = candle.row();
+        for cell in &row {
+            assert_eq!(cell, "-");
+        }
+    }
+}
