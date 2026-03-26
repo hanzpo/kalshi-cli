@@ -60,116 +60,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Manage configuration
-    Config {
-        #[command(subcommand)]
-        cmd: ConfigCmd,
-    },
-    /// Exchange status and info
-    Exchange {
-        #[command(subcommand)]
-        cmd: ExchangeCmd,
-    },
-    /// Markets
-    Market {
-        #[command(subcommand)]
-        cmd: MarketCmd,
-    },
-    /// Events
-    Event {
-        #[command(subcommand)]
-        cmd: EventCmd,
-    },
-    /// Series
-    Series {
-        #[command(subcommand)]
-        cmd: SeriesCmd,
-    },
-    /// Orders (requires auth)
-    Order {
-        #[command(subcommand)]
-        cmd: OrderCmd,
-    },
-    /// Order groups (requires auth)
-    OrderGroup {
-        #[command(subcommand)]
-        cmd: OrderGroupCmd,
-    },
-    /// Portfolio (requires auth)
-    Portfolio {
-        #[command(subcommand)]
-        cmd: PortfolioCmd,
-    },
-    /// Historical data
-    Historical {
-        #[command(subcommand)]
-        cmd: HistoricalCmd,
-    },
-    /// Subaccounts (requires auth)
-    Subaccount {
-        #[command(subcommand)]
-        cmd: SubaccountCmd,
-    },
-    /// API key management (requires auth)
-    ApiKey {
-        #[command(subcommand)]
-        cmd: ApiKeyCmd,
-    },
-    /// Request for quotes (requires auth)
-    Rfq {
-        #[command(subcommand)]
-        cmd: RfqCmd,
-    },
-    /// Quotes (requires auth)
-    Quote {
-        #[command(subcommand)]
-        cmd: QuoteCmd,
-    },
-    /// Account info (requires auth)
-    Account {
-        #[command(subcommand)]
-        cmd: AccountCmd,
-    },
-    /// Search metadata
-    Search {
-        #[command(subcommand)]
-        cmd: SearchCmd,
-    },
-    /// Milestones
-    Milestone {
-        #[command(subcommand)]
-        cmd: MilestoneCmd,
-    },
-    /// Live data feeds
-    LiveData {
-        #[command(subcommand)]
-        cmd: LiveDataCmd,
-    },
-    /// Structured targets
-    StructuredTarget {
-        #[command(subcommand)]
-        cmd: StructuredTargetCmd,
-    },
-    /// Incentive programs
-    IncentiveProgram {
-        #[command(subcommand)]
-        cmd: IncentiveProgramCmd,
-    },
-    /// FCM data (requires auth)
-    Fcm {
-        #[command(subcommand)]
-        cmd: FcmCmd,
-    },
-    /// Multivariate event collections
-    Collection {
-        #[command(subcommand)]
-        cmd: CollectionCmd,
-    },
-    /// Generate shell completions
-    Completions {
-        /// Shell to generate completions for
-        shell: clap_complete::Shell,
-    },
+    // ── Quick actions ──
     /// Quick status dashboard (requires auth)
     Status,
     /// Quick buy (shortcut for order create, requires auth)
@@ -215,11 +106,84 @@ pub enum Command {
         #[arg(long)]
         ticker: Option<String>,
     },
-    /// Export data to file (requires auth)
+
+    // ── Browse & discover ──
+    /// Markets (list, search, orderbook, analytics)
+    Market {
+        #[command(subcommand)]
+        cmd: MarketCmd,
+    },
+    /// Events (groups of related markets)
+    Event {
+        #[command(subcommand)]
+        cmd: EventCmd,
+    },
+    /// Event series (groups of related events)
+    Series {
+        #[command(subcommand)]
+        cmd: SeriesCmd,
+    },
+    /// Sports & event milestones
+    Milestone {
+        #[command(subcommand)]
+        cmd: MilestoneCmd,
+    },
+    /// Multivariate event collections (combo markets)
+    Collection {
+        #[command(subcommand)]
+        cmd: CollectionCmd,
+    },
+
+    // ── Trading ──
+    /// Orders (requires auth)
+    Order {
+        #[command(subcommand)]
+        cmd: OrderCmd,
+    },
+    /// Order groups / brackets (requires auth)
+    OrderGroup {
+        #[command(subcommand)]
+        cmd: OrderGroupCmd,
+    },
+    /// Request for quotes / block trades (requires auth)
+    Rfq {
+        #[command(subcommand)]
+        cmd: RfqCmd,
+    },
+    /// Quotes for RFQs (requires auth)
+    Quote {
+        #[command(subcommand)]
+        cmd: QuoteCmd,
+    },
+
+    // ── Portfolio & account ──
+    /// Portfolio: balance, positions, fills, settlements (requires auth)
+    Portfolio {
+        #[command(subcommand)]
+        cmd: PortfolioCmd,
+    },
+    /// Historical data (past markets, trades, candlesticks)
+    Historical {
+        #[command(subcommand)]
+        cmd: HistoricalCmd,
+    },
+    /// Export data to CSV/JSON (requires auth)
     Export {
         #[command(subcommand)]
         cmd: ExportCmd,
     },
+    /// Account info (requires auth)
+    Account {
+        #[command(subcommand)]
+        cmd: AccountCmd,
+    },
+    /// Subaccounts (requires auth)
+    Subaccount {
+        #[command(subcommand)]
+        cmd: SubaccountCmd,
+    },
+
+    // ── Real-time ──
     /// Watch real-time market data via WebSocket
     Watch {
         #[command(subcommand)]
@@ -230,6 +194,8 @@ pub enum Command {
         #[command(subcommand)]
         cmd: AlertCmd,
     },
+
+    // ── Utilities ──
     /// Get the Kalshi website URL for a market ticker
     Url {
         /// Market ticker (e.g. KXMARMAD-26-DUKE)
@@ -237,6 +203,59 @@ pub enum Command {
         /// Open the URL in your browser
         #[arg(long)]
         open: bool,
+    },
+    /// Exchange status and info
+    Exchange {
+        #[command(subcommand)]
+        cmd: ExchangeCmd,
+    },
+    /// Manage configuration
+    Config {
+        #[command(subcommand)]
+        cmd: ConfigCmd,
+    },
+    /// API key management (requires auth)
+    ApiKey {
+        #[command(subcommand)]
+        cmd: ApiKeyCmd,
+    },
+
+    // ── Hidden (advanced/niche) ──
+    /// Generate shell completions
+    #[command(hide = true)]
+    Completions {
+        /// Shell to generate completions for
+        shell: clap_complete::Shell,
+    },
+    /// Live data feeds for milestones
+    #[command(hide = true)]
+    LiveData {
+        #[command(subcommand)]
+        cmd: LiveDataCmd,
+    },
+    /// Structured targets
+    #[command(hide = true)]
+    StructuredTarget {
+        #[command(subcommand)]
+        cmd: StructuredTargetCmd,
+    },
+    /// Incentive programs
+    #[command(hide = true)]
+    IncentiveProgram {
+        #[command(subcommand)]
+        cmd: IncentiveProgramCmd,
+    },
+    /// FCM data (requires auth)
+    #[command(hide = true)]
+    Fcm {
+        #[command(subcommand)]
+        cmd: FcmCmd,
+    },
+    /// Search tags and filters metadata
+    #[command(hide = true)]
+    Search {
+        #[command(subcommand)]
+        cmd: SearchCmd,
     },
 }
 
