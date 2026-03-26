@@ -19,6 +19,7 @@ pub struct OutputConfig {
     pub no_pager: bool,
     pub color: bool,
     pub quiet: bool,
+    #[allow(dead_code)]
     pub yes: bool,
 }
 

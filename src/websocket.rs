@@ -80,6 +80,7 @@ impl KalshiWebSocket {
         msg.to_string()
     }
 
+    #[allow(dead_code)]
     pub fn unsubscribe_msg(
         id: u64,
         channels: &[&str],

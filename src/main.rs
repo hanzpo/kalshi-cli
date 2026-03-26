@@ -3,6 +3,7 @@ mod auth;
 mod browse;
 mod cli;
 mod client;
+#[allow(dead_code)]
 mod color;
 mod commands;
 mod config;

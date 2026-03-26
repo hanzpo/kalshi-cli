@@ -54,10 +54,12 @@ impl KalshiClient {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn base_url(&self) -> &str {
         &self.base_url
     }
 
+    #[cfg(test)]
     pub(crate) fn has_auth(&self) -> bool {
         self.signer.is_some()
     }
