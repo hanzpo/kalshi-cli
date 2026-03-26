@@ -59,10 +59,11 @@ pub async fn execute(cmd: AlertCmd, ws: &KalshiWebSocket, _out: &OutputConfig) -
 
             let (mut sink, mut stream) = ws.connect().await?;
 
-            // Subscribe to ticker channels for each unique ticker
-            for (i, ticker) in tickers.iter().enumerate() {
+            // Subscribe to ticker channel for all unique tickers at once
+            {
+                let ticker_refs: Vec<&str> = tickers.iter().map(|s| s.as_str()).collect();
                 let sub_msg =
-                    KalshiWebSocket::subscribe_msg((i + 1) as u64, &["ticker"], Some(ticker));
+                    KalshiWebSocket::subscribe_msg(1, &["ticker"], &ticker_refs, false);
                 use futures_util::SinkExt;
                 sink.send(Message::Text(sub_msg.into())).await?;
             }
@@ -124,15 +125,11 @@ fn check_alerts(alerts: &[Alert], msg: &serde_json::Value) {
             if alert.ticker != ticker {
                 continue;
             }
-            if let Some(above) = alert.above {
-                if price >= above {
-                    send_notification(&format!("Alert: {} price {}c >= {}c", ticker, price, above));
-                }
+            if let Some(above) = alert.above && price >= above {
+                send_notification(&format!("Alert: {} price {}c >= {}c", ticker, price, above));
             }
-            if let Some(below) = alert.below {
-                if price <= below {
-                    send_notification(&format!("Alert: {} price {}c <= {}c", ticker, price, below));
-                }
+            if let Some(below) = alert.below && price <= below {
+                send_notification(&format!("Alert: {} price {}c <= {}c", ticker, price, below));
             }
         }
     }

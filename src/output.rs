@@ -19,8 +19,6 @@ pub struct OutputConfig {
     pub no_pager: bool,
     pub color: bool,
     pub quiet: bool,
-    #[allow(dead_code)]
-    pub yes: bool,
 }
 
 pub trait TableDisplay {
@@ -142,15 +140,15 @@ pub fn output_paginated<T: Serialize + TableDisplay>(
     Ok(())
 }
 
-pub fn output_one<T: Serialize + TableDisplay + Clone>(data: &T, cfg: &OutputConfig) -> Result<()> {
+pub fn output_one<T: Serialize + TableDisplay>(data: &T, cfg: &OutputConfig) -> Result<()> {
     if cfg.quiet {
-        print_quiet(&[data.clone()]);
+        print_quiet(std::slice::from_ref(data));
         return Ok(());
     }
     match cfg.format {
         OutputFormat::Json => print_json(data, cfg.no_pager),
-        OutputFormat::Table => print_table(&[data.clone()], cfg.no_pager, cfg.color),
-        OutputFormat::Csv => print_csv(&[data.clone()]),
+        OutputFormat::Table => print_table(std::slice::from_ref(data), cfg.no_pager, cfg.color),
+        OutputFormat::Csv => print_csv(std::slice::from_ref(data)),
     }
 }
 
@@ -186,7 +184,6 @@ mod tests {
             no_pager: true,
             color: false,
             quiet,
-            yes: false,
         }
     }
 

@@ -62,7 +62,7 @@ pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<
         .extra
         .get("sub_title")
         .and_then(|v| v.as_str())
-        .or_else(|| event.title.as_deref());
+        .or(event.title.as_deref());
 
     let slug = match sub_title {
         Some(title) => slugify(title),

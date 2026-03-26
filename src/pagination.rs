@@ -88,7 +88,7 @@ where
                 let (mut items, next_cursor) =
                     fetcher(BROWSE_PAGE_SIZE, effective_cursor).await?;
 
-                if next_cursor.as_ref().map_or(true, |c| c.is_empty()) {
+                if next_cursor.as_ref().is_none_or(|c| c.is_empty()) {
                     *api_exhausted.lock().unwrap() = true;
                 }
 
@@ -110,7 +110,7 @@ where
             all: false,
             max_page_size,
         };
-        let result = auto_paginate(&opts, |l, c| fetcher(l, c)).await?;
+        let result = auto_paginate(&opts, fetcher).await?;
         output_paginated(&result.items, result.has_more, format)
     }
 }
@@ -141,7 +141,7 @@ where
         }
 
         let (items, next_cursor) = fetcher(fetch_limit, cursor).await?;
-        let done = items.is_empty() || next_cursor.as_ref().map_or(true, |c| c.is_empty());
+        let done = items.is_empty() || next_cursor.as_ref().is_none_or(|c| c.is_empty());
         all_items.extend(items);
 
         if done {
@@ -154,10 +154,8 @@ where
         cursor = next_cursor;
     }
 
-    if !opts.all {
-        if let Some(limit) = opts.limit {
-            all_items.truncate(limit as usize);
-        }
+    if !opts.all && let Some(limit) = opts.limit {
+        all_items.truncate(limit as usize);
     }
 
     Ok(PaginatedResult {

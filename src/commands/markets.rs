@@ -109,8 +109,6 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
         } => {
             paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), format, |page_limit: u32, page_cursor: Option<String>| {
                 let ticker = ticker.clone();
-                let min_ts = min_ts;
-                let max_ts = max_ts;
                 async move {
                     let mut query: Vec<(String, String)> =
                         vec![("limit".to_string(), page_limit.to_string())];
@@ -312,11 +310,9 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 .items
                 .into_iter()
                 .filter(|m| {
-                    if let Some(ref ct) = m.close_time {
-                        if let Ok(t) = chrono::DateTime::parse_from_rfc3339(ct) {
-                            let t_utc = t.with_timezone(&chrono::Utc);
-                            return t_utc > now && t_utc <= cutoff;
-                        }
+                    if let Some(ref ct) = m.close_time && let Ok(t) = chrono::DateTime::parse_from_rfc3339(ct) {
+                        let t_utc = t.with_timezone(&chrono::Utc);
+                        return t_utc > now && t_utc <= cutoff;
                     }
                     false
                 })

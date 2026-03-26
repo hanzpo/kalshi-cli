@@ -3,8 +3,6 @@ mod auth;
 mod browse;
 mod cli;
 mod client;
-#[allow(dead_code)]
-mod color;
 mod commands;
 mod config;
 mod confirm;
@@ -27,10 +25,10 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Commands that don't need a client
-    if matches!(cli.command, Command::Config { .. }) {
-        if let Command::Config { cmd } = cli.command {
-            return commands::config_cmd::execute(cmd).await;
-        }
+    if matches!(cli.command, Command::Config { .. })
+        && let Command::Config { cmd } = cli.command
+    {
+        return commands::config_cmd::execute(cmd).await;
     }
     if let Command::Completions { shell } = cli.command {
         commands::completions::execute(shell);
@@ -47,7 +45,6 @@ async fn main() -> Result<()> {
         no_pager: cli.no_pager,
         color,
         quiet: cli.quiet,
-        yes: cli.yes,
     };
 
     match cli.command {

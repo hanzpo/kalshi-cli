@@ -30,10 +30,6 @@ pub struct Cli {
     #[arg(long, global = true, value_enum, default_value = "table")]
     pub output: OutputFormat,
 
-    /// Verbose output (show request details)
-    #[arg(short, long, global = true)]
-    pub verbose: bool,
-
     /// Disable automatic paging of long output
     #[arg(long, global = true)]
     pub no_pager: bool,
@@ -1265,25 +1261,51 @@ pub enum ExportCmd {
 
 #[derive(Subcommand)]
 pub enum WatchCmd {
-    /// Watch live price updates for a market (requires auth)
+    /// Watch live price updates for one or more markets
     Ticker {
-        /// Market ticker
-        market: String,
+        /// Market ticker(s)
+        #[arg(required = true)]
+        markets: Vec<String>,
     },
-    /// Watch live trades for a market, or all trades (requires auth)
+    /// Watch live trades (optionally filtered to specific markets)
     Trade {
-        /// Market ticker (omit to watch all trades)
-        market: Option<String>,
+        /// Market ticker(s) (omit to watch all trades)
+        markets: Vec<String>,
+    },
+    /// Watch orderbook updates for one or more markets
+    Orderbook {
+        /// Market ticker(s)
+        #[arg(required = true)]
+        markets: Vec<String>,
+        /// Request an initial orderbook snapshot before streaming deltas
+        #[arg(long)]
+        snapshot: bool,
     },
     /// Watch your fill notifications (requires auth)
-    Fill,
-    /// Watch your position updates (requires auth)
-    Position,
-    /// Watch orderbook updates for a market (requires auth)
-    Orderbook {
-        /// Market ticker
-        market: String,
+    Fill {
+        /// Market ticker(s) (omit to watch all fills)
+        markets: Vec<String>,
     },
+    /// Watch your position updates (requires auth)
+    Position {
+        /// Market ticker(s) (omit to watch all positions)
+        markets: Vec<String>,
+    },
+    /// Watch your order status updates (requires auth)
+    Orders {
+        /// Market ticker(s) (omit to watch all orders)
+        markets: Vec<String>,
+    },
+    /// Watch market & event lifecycle changes (created, settled, etc.)
+    Lifecycle,
+    /// Watch RFQ and quote notifications (requires auth)
+    Communications,
+    /// Watch order group updates (requires auth)
+    OrderGroupUpdates,
+    /// Watch multivariate market & event lifecycle changes
+    MultivarLifecycle,
+    /// Watch multivariate collection lookups
+    Multivariate,
 }
 
 // ── Alert ──

@@ -58,7 +58,7 @@ where
 
 /// Display a countdown timer while waiting for rate limit to clear.
 async fn show_retry_countdown(total_ms: u64, attempt: u32) {
-    let total_secs = (total_ms + 999) / 1000; // round up
+    let total_secs = total_ms.div_ceil(1000);
     for remaining in (1..=total_secs).rev() {
         // \r overwrites the current line; raw mode is off here
         print!(
@@ -129,9 +129,7 @@ where
                 }
             }
             Action::PrevPage => {
-                if current > 0 {
-                    current -= 1;
-                }
+                current = current.saturating_sub(1);
             }
             Action::Quit => break,
         }
