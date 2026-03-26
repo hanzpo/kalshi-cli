@@ -26,7 +26,7 @@ pub async fn execute(
             };
             output_one(&balance, out)?;
         }
-        PortfolioCmd::Positions {
+        PortfolioCmd::Position {
             limit,
             cursor,
             all,
@@ -68,7 +68,7 @@ pub async fn execute(
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
         }
-        PortfolioCmd::Fills {
+        PortfolioCmd::Fill {
             limit,
             cursor,
             all,
@@ -108,7 +108,7 @@ pub async fn execute(
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
         }
-        PortfolioCmd::Settlements {
+        PortfolioCmd::Settlement {
             limit,
             cursor,
             all,
@@ -143,6 +143,37 @@ pub async fn execute(
                 "Total resting order value: {} cents",
                 resp.total_resting_order_value.unwrap_or(0)
             );
+        }
+        PortfolioCmd::Summary => {
+            let (balance, positions, settlements) = tokio::try_join!(
+                client.get::<BalanceResponse>("/portfolio/balance", &[]),
+                client.get::<PositionsResponse>("/portfolio/positions", &[("limit", "1000")]),
+                client.get::<SettlementsResponse>("/portfolio/settlements", &[("limit", "1000")]),
+            )?;
+
+            let balance_cents = balance.balance.unwrap_or(0);
+            let portfolio_cents = balance.portfolio_value.unwrap_or(0);
+            let payout_cents = balance.payout.unwrap_or(0);
+
+            let pos_list = positions.market_positions.unwrap_or_default();
+            let settle_list = settlements.settlements.unwrap_or_default();
+
+            let total_position_count = pos_list.len();
+            let total_contracts: i64 = pos_list
+                .iter()
+                .map(|p| p.position.unwrap_or(0).abs())
+                .sum();
+
+            let total_settled = settle_list.len();
+
+            println!("=== Portfolio Summary ===");
+            println!();
+            println!("Cash Balance:    ${:.2}", balance_cents as f64 / 100.0);
+            println!("Portfolio Value: ${:.2}", portfolio_cents as f64 / 100.0);
+            println!("Payout:          ${:.2}", payout_cents as f64 / 100.0);
+            println!();
+            println!("Open Positions:  {} ({} contracts)", total_position_count, total_contracts);
+            println!("Settlements:     {}", total_settled);
         }
     }
     Ok(())

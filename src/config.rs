@@ -1,7 +1,15 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct Profile {
+    pub api_key_id: Option<String>,
+    pub private_key_path: Option<String>,
+    pub demo: Option<bool>,
+}
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -9,6 +17,8 @@ pub struct Config {
     pub private_key_path: Option<String>,
     pub default_output: Option<String>,
     pub demo: Option<bool>,
+    #[serde(default)]
+    pub profiles: HashMap<String, Profile>,
 }
 
 impl Config {
@@ -35,6 +45,28 @@ impl Config {
         }
 
         Ok(config)
+    }
+
+    /// Overlay a named profile onto the base config.
+    pub fn resolve(mut self, profile_name: Option<&str>) -> Result<Self> {
+        let name = match profile_name {
+            Some(n) => Some(n.to_string()),
+            None => std::env::var("KALSHI_PROFILE").ok(),
+        };
+        if let Some(name) = name {
+            let profile = self.profiles.get(&name)
+                .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in config", name))?;
+            if let Some(ref v) = profile.api_key_id {
+                self.api_key_id = Some(v.clone());
+            }
+            if let Some(ref v) = profile.private_key_path {
+                self.private_key_path = Some(v.clone());
+            }
+            if let Some(v) = profile.demo {
+                self.demo = Some(v);
+            }
+        }
+        Ok(self)
     }
 
     pub fn save(&self, override_path: Option<&Path>) -> Result<()> {

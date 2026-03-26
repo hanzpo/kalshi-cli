@@ -29,6 +29,11 @@ impl TableDisplay for ExchangeStatus {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserDataTimestampResponse {
+    pub as_of_time: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScheduleResponse {
     pub schedule: Option<Schedule>,

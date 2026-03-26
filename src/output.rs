@@ -9,6 +9,7 @@ use serde::Serialize;
 pub enum OutputFormat {
     Json,
     Table,
+    Csv,
 }
 
 /// Bundles output settings passed through commands.
@@ -16,11 +17,17 @@ pub enum OutputFormat {
 pub struct OutputConfig {
     pub format: OutputFormat,
     pub no_pager: bool,
+    pub color: bool,
+    pub quiet: bool,
+    pub yes: bool,
 }
 
 pub trait TableDisplay {
     fn headers() -> Vec<&'static str>;
     fn row(&self) -> Vec<String>;
+    fn colored_row(&self, _color: bool) -> Vec<String> {
+        self.row()
+    }
 }
 
 /// Write output through the system pager if stdout is a TTY and content is tall.
@@ -71,7 +78,7 @@ pub fn print_json<T: Serialize + ?Sized>(data: &T, no_pager: bool) -> Result<()>
     Ok(())
 }
 
-pub fn print_table<T: TableDisplay>(items: &[T], no_pager: bool) -> Result<()> {
+pub fn print_table<T: TableDisplay>(items: &[T], no_pager: bool, color: bool) -> Result<()> {
     if items.is_empty() {
         println!("No results.");
         return Ok(());
@@ -81,16 +88,40 @@ pub fn print_table<T: TableDisplay>(items: &[T], no_pager: bool) -> Result<()> {
     table.load_preset(UTF8_FULL_CONDENSED);
     table.set_header(T::headers());
     for item in items {
-        table.add_row(item.row());
+        table.add_row(item.colored_row(color));
     }
     paged_print(&format!("{table}\n"), no_pager);
     Ok(())
 }
 
+pub fn print_csv<T: TableDisplay>(items: &[T]) -> Result<()> {
+    let mut wtr = csv::Writer::from_writer(io::stdout());
+    wtr.write_record(T::headers())?;
+    for item in items {
+        wtr.write_record(item.row())?;
+    }
+    wtr.flush()?;
+    Ok(())
+}
+
+pub fn print_quiet<T: TableDisplay>(items: &[T]) {
+    for item in items {
+        let row = item.row();
+        if let Some(first) = row.first() {
+            println!("{}", first);
+        }
+    }
+}
+
 pub fn output<T: Serialize + TableDisplay>(data: &[T], cfg: &OutputConfig) -> Result<()> {
+    if cfg.quiet {
+        print_quiet(data);
+        return Ok(());
+    }
     match cfg.format {
         OutputFormat::Json => print_json(data, cfg.no_pager),
-        OutputFormat::Table => print_table(data, cfg.no_pager),
+        OutputFormat::Table => print_table(data, cfg.no_pager, cfg.color),
+        OutputFormat::Csv => print_csv(data),
     }
 }
 
@@ -114,8 +145,13 @@ pub fn output_one<T: Serialize + TableDisplay + Clone>(
     data: &T,
     cfg: &OutputConfig,
 ) -> Result<()> {
+    if cfg.quiet {
+        print_quiet(&[data.clone()]);
+        return Ok(());
+    }
     match cfg.format {
         OutputFormat::Json => print_json(data, cfg.no_pager),
-        OutputFormat::Table => print_table(&[data.clone()], cfg.no_pager),
+        OutputFormat::Table => print_table(&[data.clone()], cfg.no_pager, cfg.color),
+        OutputFormat::Csv => print_csv(&[data.clone()]),
     }
 }

@@ -6,7 +6,7 @@ use crate::models::historical::{CutoffResponse, HistoricalMarketsResponse};
 use crate::models::market::{CandlesticksResponse, TradesResponse};
 use crate::models::order::OrdersResponse;
 use crate::models::portfolio::FillsResponse;
-use crate::output::{OutputConfig, output, output_paginated};
+use crate::output::{OutputConfig, output, output_paginated, print_json};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
 pub async fn execute(
@@ -15,7 +15,7 @@ pub async fn execute(
     out: &OutputConfig,
 ) -> Result<()> {
     match cmd {
-        HistoricalCmd::Markets {
+        HistoricalCmd::Market {
             limit,
             cursor,
             ticker,
@@ -53,7 +53,7 @@ pub async fn execute(
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
         }
-        HistoricalCmd::Trades {
+        HistoricalCmd::Trade {
             limit,
             cursor,
             ticker,
@@ -91,7 +91,7 @@ pub async fn execute(
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
         }
-        HistoricalCmd::Candlesticks {
+        HistoricalCmd::Candlestick {
             ticker,
             series_ticker,
             period,
@@ -125,7 +125,7 @@ pub async fn execute(
                 resp.cutoff_ts.unwrap_or_else(|| "-".to_string())
             );
         }
-        HistoricalCmd::Fills {
+        HistoricalCmd::Fill {
             limit,
             cursor,
             ticker,
@@ -156,7 +156,7 @@ pub async fn execute(
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
         }
-        HistoricalCmd::Orders {
+        HistoricalCmd::Order {
             limit,
             cursor,
             ticker,
@@ -186,6 +186,11 @@ pub async fn execute(
             })
             .await?;
             output_paginated(&result.items, result.has_more, out)?;
+        }
+        HistoricalCmd::MarketDetail { ticker } => {
+            let path = format!("/historical/markets/{}", ticker);
+            let resp: serde_json::Value = client.get(&path, &[]).await?;
+            print_json(&resp, out.no_pager)?;
         }
     }
     Ok(())

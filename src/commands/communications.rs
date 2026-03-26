@@ -59,6 +59,10 @@ pub async fn execute_rfq(
             let resp: serde_json::Value = client.delete(&path).await?;
             print_json(&resp, out.no_pager)?;
         }
+        RfqCmd::Id => {
+            let resp: serde_json::Value = client.get("/communications/id", &[]).await?;
+            print_json(&resp, out.no_pager)?;
+        }
     }
     Ok(())
 }
@@ -93,6 +97,20 @@ pub async fn execute_quote(
         QuoteCmd::Cancel { quote_id } => {
             let path = format!("/communications/quotes/{}", quote_id);
             let resp: serde_json::Value = client.delete(&path).await?;
+            print_json(&resp, out.no_pager)?;
+        }
+        QuoteCmd::Get { quote_id } => {
+            let path = format!("/communications/quotes/{}", quote_id);
+            let resp: QuoteResponse = client.get(&path, &[]).await?;
+            if let Some(quote) = resp.quote {
+                output_one(&quote, out)?;
+            } else {
+                println!("Quote not found.");
+            }
+        }
+        QuoteCmd::Confirm { quote_id } => {
+            let path = format!("/communications/quotes/{}/confirm", quote_id);
+            let resp: serde_json::Value = client.put(&path, &serde_json::json!({})).await?;
             print_json(&resp, out.no_pager)?;
         }
     }

@@ -35,6 +35,7 @@ pub async fn execute(cmd: ConfigCmd) -> Result<()> {
                 },
                 default_output: Some("table".to_string()),
                 demo: None,
+                profiles: std::collections::HashMap::new(),
             };
 
             config.save(None)?;
@@ -58,6 +59,56 @@ pub async fn execute(cmd: ConfigCmd) -> Result<()> {
                 config.default_output.as_deref().unwrap_or("table")
             );
             println!("demo: {}", config.demo.unwrap_or(false));
+        }
+        ConfigCmd::ProfileList => {
+            let config = Config::load(None)?;
+            if config.profiles.is_empty() {
+                println!("No profiles configured.");
+            } else {
+                for name in config.profiles.keys() {
+                    println!("{}", name);
+                }
+            }
+        }
+        ConfigCmd::ProfileAdd { name } => {
+            let mut config = Config::load(None)?;
+
+            let api_key_id = prompt("API Key ID: ")?;
+            let private_key_path = prompt("Path to private key PEM file: ")?;
+
+            let profile = crate::config::Profile {
+                api_key_id: if api_key_id.is_empty() {
+                    None
+                } else {
+                    Some(api_key_id)
+                },
+                private_key_path: if private_key_path.is_empty() {
+                    None
+                } else {
+                    let expanded = if private_key_path.starts_with("~/") {
+                        dirs::home_dir()
+                            .map(|h| h.join(&private_key_path[2..]).to_string_lossy().to_string())
+                            .unwrap_or(private_key_path)
+                    } else {
+                        private_key_path
+                    };
+                    Some(expanded)
+                },
+                demo: None,
+            };
+
+            config.profiles.insert(name.clone(), profile);
+            config.save(None)?;
+            println!("Profile '{}' added.", name);
+        }
+        ConfigCmd::ProfileRemove { name } => {
+            let mut config = Config::load(None)?;
+            if config.profiles.remove(&name).is_some() {
+                config.save(None)?;
+                println!("Profile '{}' removed.", name);
+            } else {
+                println!("Profile '{}' not found.", name);
+            }
         }
     }
     Ok(())

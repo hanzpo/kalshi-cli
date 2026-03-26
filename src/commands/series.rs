@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::cli::SeriesCmd;
 use crate::client::KalshiClient;
 use crate::models::series::{SeriesListResponse, SeriesResponse};
-use crate::output::{OutputConfig, output_one, output_paginated};
+use crate::output::{OutputConfig, output_one, output_paginated, print_json};
 use crate::pagination::{PaginationOpts, auto_paginate};
 
 pub async fn execute(client: &KalshiClient, cmd: SeriesCmd, out: &OutputConfig) -> Result<()> {
@@ -27,6 +27,17 @@ pub async fn execute(client: &KalshiClient, cmd: SeriesCmd, out: &OutputConfig) 
             let path = format!("/series/{}", series_ticker);
             let resp: SeriesResponse = client.get(&path, &[]).await?;
             output_one(&resp.series, out)?;
+        }
+        SeriesCmd::FeeChange { series_ticker, show_historical } => {
+            let mut query = Vec::new();
+            if let Some(ref s) = series_ticker {
+                query.push(("series_ticker", s.as_str()));
+            }
+            if show_historical {
+                query.push(("show_historical", "true"));
+            }
+            let resp: serde_json::Value = client.get("/series/fee_changes", &query).await?;
+            print_json(&resp, out.no_pager)?;
         }
     }
     Ok(())

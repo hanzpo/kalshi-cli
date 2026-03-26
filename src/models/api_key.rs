@@ -28,6 +28,13 @@ pub struct ApiKeyResponse {
     pub api_key: Option<ApiKey>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct GenerateApiKeyRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
+}
+
 impl TableDisplay for ApiKey {
     fn headers() -> Vec<&'static str> {
         vec!["ID", "Name", "Status", "Created"]

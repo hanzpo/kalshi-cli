@@ -147,6 +147,11 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -
                 client.get("/portfolio/orders/queue_positions", &query).await?;
             print_json(&resp.queue_positions, out.no_pager)?;
         }
+        OrderCmd::QueuePosition { order_id } => {
+            let path = format!("/portfolio/orders/{}/queue_position", order_id);
+            let resp: serde_json::Value = client.get(&path, &[]).await?;
+            print_json(&resp, out.no_pager)?;
+        }
     }
     Ok(())
 }

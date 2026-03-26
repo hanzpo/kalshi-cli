@@ -77,6 +77,12 @@ pub struct NettingResponse {
     pub data: serde_json::Value,
 }
 
+#[derive(Debug, Serialize)]
+pub struct UpdateNettingRequest {
+    pub subaccount_number: i64,
+    pub enabled: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateSubaccountResponse {
     pub subaccount_id: Option<i64>,

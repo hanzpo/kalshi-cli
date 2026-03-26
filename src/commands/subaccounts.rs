@@ -4,7 +4,7 @@ use crate::cli::SubaccountCmd;
 use crate::client::KalshiClient;
 use crate::models::subaccount::{
     CreateSubaccountRequest, CreateSubaccountResponse, NettingResponse, SubaccountBalancesResponse,
-    TransferRequest, TransferResponse, TransfersResponse,
+    TransferRequest, TransferResponse, TransfersResponse, UpdateNettingRequest,
 };
 use crate::output::{OutputConfig, output, print_json};
 
@@ -34,12 +34,12 @@ pub async fn execute(
                 resp.transfer_id.unwrap_or_else(|| "-".to_string())
             );
         }
-        SubaccountCmd::Balances => {
+        SubaccountCmd::Balance => {
             let resp: SubaccountBalancesResponse =
                 client.get("/portfolio/subaccounts/balances", &[]).await?;
             output(&resp.subaccount_balances.unwrap_or_default(), out)?;
         }
-        SubaccountCmd::Transfers { limit, cursor } => {
+        SubaccountCmd::TransferList { limit, cursor } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {
@@ -58,6 +58,18 @@ pub async fn execute(
                 .get("/portfolio/subaccounts/netting", &[])
                 .await?;
             print_json(&resp.data, out.no_pager)?;
+        }
+        SubaccountCmd::NettingUpdate {
+            subaccount_number,
+            enabled,
+        } => {
+            let req = UpdateNettingRequest {
+                subaccount_number,
+                enabled,
+            };
+            let resp: serde_json::Value =
+                client.put("/portfolio/subaccounts/netting", &req).await?;
+            print_json(&resp, out.no_pager)?;
         }
     }
     Ok(())

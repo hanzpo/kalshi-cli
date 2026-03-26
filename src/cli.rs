@@ -27,6 +27,22 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_pager: bool,
 
+    /// Disable colored output
+    #[arg(long, global = true)]
+    pub no_color: bool,
+
+    /// Quiet mode (print only IDs/tickers, one per line)
+    #[arg(short, long, global = true)]
+    pub quiet: bool,
+
+    /// Skip confirmation prompts
+    #[arg(short = 'y', long, global = true)]
+    pub yes: bool,
+
+    /// Config profile to use
+    #[arg(long, global = true)]
+    pub profile: Option<String>,
+
     #[command(subcommand)]
     pub command: Command,
 }
@@ -98,6 +114,111 @@ pub enum Command {
         #[command(subcommand)]
         cmd: QuoteCmd,
     },
+    /// Account info (requires auth)
+    Account {
+        #[command(subcommand)]
+        cmd: AccountCmd,
+    },
+    /// Search metadata
+    Search {
+        #[command(subcommand)]
+        cmd: SearchCmd,
+    },
+    /// Milestones
+    Milestone {
+        #[command(subcommand)]
+        cmd: MilestoneCmd,
+    },
+    /// Live data feeds
+    LiveData {
+        #[command(subcommand)]
+        cmd: LiveDataCmd,
+    },
+    /// Structured targets
+    StructuredTarget {
+        #[command(subcommand)]
+        cmd: StructuredTargetCmd,
+    },
+    /// Incentive programs
+    IncentiveProgram {
+        #[command(subcommand)]
+        cmd: IncentiveProgramCmd,
+    },
+    /// FCM data (requires auth)
+    Fcm {
+        #[command(subcommand)]
+        cmd: FcmCmd,
+    },
+    /// Multivariate event collections
+    Collection {
+        #[command(subcommand)]
+        cmd: CollectionCmd,
+    },
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        shell: clap_complete::Shell,
+    },
+    /// Quick status dashboard (requires auth)
+    Status,
+    /// Quick buy (shortcut for order create, requires auth)
+    Buy {
+        /// Market ticker
+        ticker: String,
+        /// Number of contracts
+        quantity: i64,
+        /// Buy YES side (default)
+        #[arg(long)]
+        yes: bool,
+        /// Buy NO side
+        #[arg(long)]
+        no: bool,
+        /// Limit price in cents
+        #[arg(long)]
+        at: Option<i64>,
+    },
+    /// Quick sell (shortcut for order create, requires auth)
+    Sell {
+        /// Market ticker
+        ticker: String,
+        /// Number of contracts
+        quantity: i64,
+        /// Sell YES side (default)
+        #[arg(long)]
+        yes: bool,
+        /// Sell NO side
+        #[arg(long)]
+        no: bool,
+        /// Limit price in cents
+        #[arg(long)]
+        at: Option<i64>,
+    },
+    /// Close a position (requires auth)
+    Close {
+        /// Market ticker
+        ticker: String,
+    },
+    /// Cancel all resting orders (requires auth)
+    CancelAll {
+        /// Filter by ticker
+        #[arg(long)]
+        ticker: Option<String>,
+    },
+    /// Export data to file (requires auth)
+    Export {
+        #[command(subcommand)]
+        cmd: ExportCmd,
+    },
+    /// Watch real-time market data via WebSocket
+    Watch {
+        #[command(subcommand)]
+        cmd: WatchCmd,
+    },
+    /// Price alerts
+    Alert {
+        #[command(subcommand)]
+        cmd: AlertCmd,
+    },
 }
 
 // ── Config ──
@@ -108,6 +229,18 @@ pub enum ConfigCmd {
     Init,
     /// Show current configuration
     Show,
+    /// List config profiles
+    ProfileList,
+    /// Add a config profile interactively
+    ProfileAdd {
+        /// Profile name
+        name: String,
+    },
+    /// Remove a config profile
+    ProfileRemove {
+        /// Profile name
+        name: String,
+    },
 }
 
 // ── Exchange ──
@@ -117,9 +250,11 @@ pub enum ExchangeCmd {
     /// Get exchange status
     Status,
     /// Get exchange announcements
-    Announcements,
+    Announcement,
     /// Get exchange schedule
     Schedule,
+    /// Get user data timestamp (requires auth)
+    UserDataTimestamp,
 }
 
 // ── Market ──
@@ -148,7 +283,7 @@ pub enum MarketCmd {
         ticker: String,
     },
     /// Get market trades
-    Trades {
+    Trade {
         #[arg(long)]
         ticker: Option<String>,
         #[arg(long)]
@@ -163,7 +298,7 @@ pub enum MarketCmd {
         max_ts: Option<i64>,
     },
     /// Get market candlesticks
-    Candlesticks {
+    Candlestick {
         /// Market ticker
         ticker: String,
         /// Series ticker
@@ -185,6 +320,19 @@ pub enum MarketCmd {
         #[arg(long)]
         depth: Option<u32>,
     },
+    /// Get candlesticks for multiple markets (batch, up to 100)
+    CandlestickBatch {
+        /// Comma-separated market tickers (up to 100)
+        #[arg(long)]
+        tickers: String,
+        #[arg(long)]
+        start_ts: Option<i64>,
+        #[arg(long)]
+        end_ts: Option<i64>,
+        /// Period (e.g. 1, 60, 1440)
+        #[arg(long)]
+        period: Option<i64>,
+    },
     /// Search markets by keyword (client-side filter)
     Search {
         /// Search query (matched against title and ticker)
@@ -193,6 +341,33 @@ pub enum MarketCmd {
         limit: Option<u32>,
         #[arg(long)]
         status: Option<String>,
+    },
+    /// Show hottest markets by volume
+    Hot {
+        #[arg(long, default_value = "20")]
+        limit: u32,
+    },
+    /// Show markets expiring soon
+    Expiring {
+        /// Hours from now
+        #[arg(long, default_value = "24")]
+        within: u64,
+    },
+    /// Show markets with widest bid-ask spread
+    Spread {
+        #[arg(long, default_value = "20")]
+        limit: u32,
+    },
+    /// Analyze orderbook for a market (requires auth)
+    Analyze {
+        /// Market ticker
+        ticker: String,
+        /// Simulate buying N contracts
+        #[arg(long)]
+        buy: Option<i64>,
+        /// Simulate selling N contracts
+        #[arg(long)]
+        sell: Option<i64>,
     },
 }
 
@@ -230,6 +405,54 @@ pub enum EventCmd {
         /// Event ticker
         event_ticker: String,
     },
+    /// List multivariate events
+    Multivariate {
+        #[arg(long)]
+        limit: Option<u32>,
+        #[arg(long)]
+        cursor: Option<String>,
+        #[arg(long)]
+        series_ticker: Option<String>,
+        #[arg(long)]
+        collection_ticker: Option<String>,
+        #[arg(long)]
+        with_nested_markets: bool,
+    },
+    /// Get event candlesticks
+    Candlestick {
+        /// Event ticker
+        event_ticker: String,
+        /// Series ticker
+        #[arg(long)]
+        series_ticker: String,
+        #[arg(long)]
+        start_ts: Option<i64>,
+        #[arg(long)]
+        end_ts: Option<i64>,
+        /// Period (e.g. 1, 60, 1440)
+        #[arg(long)]
+        period: Option<i64>,
+    },
+    /// Get event forecast percentile history (requires auth, numerical events only)
+    Forecast {
+        /// Event ticker
+        event_ticker: String,
+        /// Series ticker
+        #[arg(long)]
+        series_ticker: String,
+        /// Percentiles (0-10000, e.g. 2500=25th). Repeat for multiple: --percentile 2500 --percentile 5000
+        #[arg(long = "percentile", required = true)]
+        percentiles: Vec<i64>,
+        /// Start timestamp (unix seconds, required)
+        #[arg(long)]
+        start_ts: i64,
+        /// End timestamp (unix seconds, required)
+        #[arg(long)]
+        end_ts: i64,
+        /// Period in minutes: 0 (5-sec), 1, 60, or 1440 (required)
+        #[arg(long)]
+        period: i64,
+    },
 }
 
 // ── Series ──
@@ -249,6 +472,15 @@ pub enum SeriesCmd {
     Get {
         /// Series ticker
         series_ticker: String,
+    },
+    /// Get fee changes for a series
+    FeeChange {
+        /// Series ticker
+        #[arg(long)]
+        series_ticker: Option<String>,
+        /// Include historical fee changes
+        #[arg(long)]
+        show_historical: bool,
     },
 }
 
@@ -371,6 +603,11 @@ pub enum OrderCmd {
         /// Market ticker
         ticker: String,
     },
+    /// Get queue position for a single order
+    QueuePosition {
+        /// Order ID
+        order_id: String,
+    },
 }
 
 // ── Order Group ──
@@ -427,7 +664,7 @@ pub enum PortfolioCmd {
     /// Get account balance
     Balance,
     /// Get open positions
-    Positions {
+    Position {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -444,7 +681,7 @@ pub enum PortfolioCmd {
         settlement_status: Option<String>,
     },
     /// Get trade fills
-    Fills {
+    Fill {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -461,7 +698,7 @@ pub enum PortfolioCmd {
         max_ts: Option<i64>,
     },
     /// Get settlement history
-    Settlements {
+    Settlement {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -473,6 +710,8 @@ pub enum PortfolioCmd {
     },
     /// Get total resting order value
     RestingValue,
+    /// Portfolio analytics summary
+    Summary,
 }
 
 // ── Historical ──
@@ -480,7 +719,7 @@ pub enum PortfolioCmd {
 #[derive(Subcommand)]
 pub enum HistoricalCmd {
     /// List historical markets
-    Markets {
+    Market {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -493,7 +732,7 @@ pub enum HistoricalCmd {
         max_close_ts: Option<i64>,
     },
     /// List historical trades
-    Trades {
+    Trade {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -506,7 +745,7 @@ pub enum HistoricalCmd {
         max_ts: Option<i64>,
     },
     /// Get historical candlesticks
-    Candlesticks {
+    Candlestick {
         /// Market ticker
         ticker: String,
         /// Series ticker
@@ -523,7 +762,7 @@ pub enum HistoricalCmd {
     /// Get cutoff timestamps
     Cutoff,
     /// Get historical fills (requires auth)
-    Fills {
+    Fill {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -532,13 +771,18 @@ pub enum HistoricalCmd {
         ticker: Option<String>,
     },
     /// Get historical orders (requires auth)
-    Orders {
+    Order {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
         cursor: Option<String>,
         #[arg(long)]
         ticker: Option<String>,
+    },
+    /// Get a single historical market
+    MarketDetail {
+        /// Market ticker
+        ticker: String,
     },
 }
 
@@ -565,9 +809,9 @@ pub enum SubaccountCmd {
         amount: i64,
     },
     /// Get all subaccount balances
-    Balances,
+    Balance,
     /// List transfers
-    Transfers {
+    TransferList {
         #[arg(long)]
         limit: Option<u32>,
         #[arg(long)]
@@ -575,6 +819,15 @@ pub enum SubaccountCmd {
     },
     /// Get netting settings
     Netting,
+    /// Update netting settings
+    NettingUpdate {
+        /// Subaccount number
+        #[arg(long)]
+        subaccount_number: i64,
+        /// Enable or disable netting
+        #[arg(long)]
+        enabled: bool,
+    },
 }
 
 // ── API Key ──
@@ -593,6 +846,15 @@ pub enum ApiKeyCmd {
     Delete {
         /// API key ID
         key_id: String,
+    },
+    /// Generate an API key pair (returns private key)
+    Generate {
+        /// Key name
+        #[arg(long)]
+        name: String,
+        /// Comma-separated scopes
+        #[arg(long)]
+        scopes: Option<String>,
     },
 }
 
@@ -628,6 +890,8 @@ pub enum RfqCmd {
         /// RFQ ID
         rfq_id: String,
     },
+    /// Get your communications ID
+    Id,
 }
 
 // ── Quote ──
@@ -659,4 +923,308 @@ pub enum QuoteCmd {
         /// Quote ID
         quote_id: String,
     },
+    /// Get a single quote
+    Get {
+        /// Quote ID
+        quote_id: String,
+    },
+    /// Confirm a quote
+    Confirm {
+        /// Quote ID
+        quote_id: String,
+    },
+}
+
+// ── Account ──
+
+#[derive(Subcommand)]
+pub enum AccountCmd {
+    /// Get account rate limits and usage tier
+    Limit,
+}
+
+// ── Search ──
+
+#[derive(Subcommand)]
+pub enum SearchCmd {
+    /// Get tags by categories
+    Tag,
+    /// Get filters by sport
+    Filter,
+}
+
+// ── Milestone ──
+
+#[derive(Subcommand)]
+pub enum MilestoneCmd {
+    /// List milestones
+    List {
+        /// Number of results (1-500)
+        #[arg(long)]
+        limit: u32,
+        #[arg(long)]
+        cursor: Option<String>,
+        #[arg(long)]
+        minimum_start_date: Option<String>,
+        #[arg(long)]
+        category: Option<String>,
+        #[arg(long)]
+        competition: Option<String>,
+        #[arg(long)]
+        source_id: Option<String>,
+        #[arg(long, name = "type")]
+        milestone_type: Option<String>,
+        #[arg(long)]
+        related_event_ticker: Option<String>,
+        #[arg(long)]
+        min_updated_ts: Option<i64>,
+    },
+    /// Get a single milestone
+    Get {
+        /// Milestone ID
+        milestone_id: String,
+    },
+}
+
+// ── Live Data ──
+
+#[derive(Subcommand)]
+pub enum LiveDataCmd {
+    /// Get live data for a milestone
+    Get {
+        /// Milestone ID
+        milestone_id: String,
+        /// Data type
+        #[arg(long, name = "type")]
+        data_type: String,
+    },
+    /// Batch get live data for multiple milestones
+    Batch {
+        /// Comma-separated milestone IDs (max 100)
+        #[arg(long)]
+        milestone_ids: String,
+    },
+}
+
+// ── Structured Target ──
+
+#[derive(Subcommand)]
+pub enum StructuredTargetCmd {
+    /// List structured targets
+    List {
+        #[arg(long, name = "type")]
+        target_type: Option<String>,
+        #[arg(long)]
+        competition: Option<String>,
+        #[arg(long)]
+        page_size: Option<u32>,
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+    /// Get a single structured target
+    Get {
+        /// Structured target ID
+        id: String,
+    },
+}
+
+// ── Incentive Program ──
+
+#[derive(Subcommand)]
+pub enum IncentiveProgramCmd {
+    /// List incentive programs
+    List {
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long, name = "type")]
+        program_type: Option<String>,
+        #[arg(long)]
+        limit: Option<u32>,
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+}
+
+// ── FCM ──
+
+#[derive(Subcommand)]
+pub enum FcmCmd {
+    /// List FCM orders
+    Order {
+        /// Subtrader ID (required)
+        #[arg(long)]
+        subtrader_id: String,
+        #[arg(long)]
+        cursor: Option<String>,
+        #[arg(long)]
+        event_ticker: Option<String>,
+        #[arg(long)]
+        ticker: Option<String>,
+        #[arg(long)]
+        min_ts: Option<i64>,
+        #[arg(long)]
+        max_ts: Option<i64>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        limit: Option<u32>,
+    },
+    /// List FCM positions
+    Position {
+        /// Subtrader ID (required)
+        #[arg(long)]
+        subtrader_id: String,
+        #[arg(long)]
+        ticker: Option<String>,
+        #[arg(long)]
+        event_ticker: Option<String>,
+        #[arg(long)]
+        count_filter: Option<String>,
+        #[arg(long)]
+        settlement_status: Option<String>,
+        #[arg(long)]
+        limit: Option<u32>,
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+}
+
+// ── Collection (Multivariate Event Collections) ──
+
+#[derive(Subcommand)]
+pub enum CollectionCmd {
+    /// List collections
+    List {
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        associated_event_ticker: Option<String>,
+        #[arg(long)]
+        series_ticker: Option<String>,
+        #[arg(long)]
+        limit: Option<u32>,
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+    /// Get a single collection
+    Get {
+        /// Collection ticker
+        ticker: String,
+    },
+    /// Create market from collection (requires auth)
+    CreateMarket {
+        /// Collection ticker
+        ticker: String,
+        /// Path to JSON file with selected_markets array
+        #[arg(long)]
+        file: PathBuf,
+        #[arg(long)]
+        with_market_payload: bool,
+    },
+    /// Lookup collection payout (requires auth)
+    Lookup {
+        /// Collection ticker
+        ticker: String,
+        /// Path to JSON file with selected_markets array
+        #[arg(long)]
+        file: PathBuf,
+    },
+    /// Get lookup history
+    LookupHistory {
+        /// Collection ticker
+        ticker: String,
+        /// Lookback seconds (10, 60, 300, or 3600)
+        #[arg(long)]
+        lookback_seconds: Option<i64>,
+    },
+}
+
+// ── Export ──
+
+#[derive(Clone, clap::ValueEnum)]
+pub enum ExportFormat {
+    Csv,
+    Json,
+    Jsonl,
+}
+
+#[derive(Subcommand)]
+pub enum ExportCmd {
+    /// Export trade fills
+    Fill {
+        /// Output format
+        #[arg(long, default_value = "csv")]
+        format: ExportFormat,
+        /// Only fills after this unix timestamp
+        #[arg(long)]
+        since: Option<i64>,
+        /// Output file path
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    /// Export positions
+    Position {
+        #[arg(long, default_value = "csv")]
+        format: ExportFormat,
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+    /// Export settlements
+    Settlement {
+        #[arg(long, default_value = "csv")]
+        format: ExportFormat,
+        #[arg(short, long)]
+        output: PathBuf,
+    },
+}
+
+// ── Watch ──
+
+#[derive(Subcommand)]
+pub enum WatchCmd {
+    /// Watch live price updates for a market
+    Ticker {
+        /// Market ticker
+        market: String,
+    },
+    /// Watch live trades for a market
+    Trade {
+        /// Market ticker
+        market: String,
+    },
+    /// Watch your fill notifications (requires auth)
+    Fill,
+    /// Watch your position updates (requires auth)
+    Position,
+    /// Watch orderbook updates for a market (requires auth)
+    Orderbook {
+        /// Market ticker
+        market: String,
+    },
+}
+
+// ── Alert ──
+
+#[derive(Subcommand)]
+pub enum AlertCmd {
+    /// Add a price alert
+    Add {
+        /// Market ticker
+        ticker: String,
+        /// Alert when price goes above (cents)
+        #[arg(long)]
+        above: Option<f64>,
+        /// Alert when price goes below (cents)
+        #[arg(long)]
+        below: Option<f64>,
+    },
+    /// List active alerts
+    List,
+    /// Remove an alert
+    Remove {
+        /// Alert ID (first 8 chars is enough)
+        id: String,
+    },
+    /// Watch alerts via WebSocket
+    Watch,
 }
