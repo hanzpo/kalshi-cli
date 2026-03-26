@@ -533,6 +533,32 @@ mod tests {
         assert!((proceeds - 0.0).abs() < f64::EPSILON);
     }
 
+    // ── pick_search_page_size tests ──
+
+    #[test]
+    fn pick_search_page_size_exact_match() {
+        assert_eq!(pick_search_page_size(25), 25);
+        assert_eq!(pick_search_page_size(100), 100);
+    }
+
+    #[test]
+    fn pick_search_page_size_rounds_up_to_nearest() {
+        assert_eq!(pick_search_page_size(1), 3);
+        assert_eq!(pick_search_page_size(4), 5);
+        assert_eq!(pick_search_page_size(6), 8);
+        assert_eq!(pick_search_page_size(20), 25);
+        assert_eq!(pick_search_page_size(26), 30);
+        assert_eq!(pick_search_page_size(51), 70);
+        assert_eq!(pick_search_page_size(71), 100);
+    }
+
+    #[test]
+    fn pick_search_page_size_clamps_to_max() {
+        // Anything above 100 gets clamped to 100
+        assert_eq!(pick_search_page_size(101), 100);
+        assert_eq!(pick_search_page_size(500), 100);
+    }
+
     // ── build_market_query tests ──
 
     #[test]

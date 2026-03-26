@@ -180,65 +180,18 @@ mod tests {
         }
     }
 
-    #[test]
-    fn output_config_construction() {
-        let cfg = OutputConfig {
-            format: OutputFormat::Table,
+    fn cfg(format: OutputFormat, quiet: bool) -> OutputConfig {
+        OutputConfig {
+            format,
             no_pager: true,
             color: false,
-            quiet: false,
+            quiet,
             yes: false,
-        };
-        assert!(cfg.no_pager);
-        assert!(!cfg.color);
-        assert!(!cfg.quiet);
-        assert!(!cfg.yes);
+        }
     }
 
     #[test]
-    fn output_format_json_variant_exists() {
-        let _f = OutputFormat::Json;
-    }
-
-    #[test]
-    fn output_format_table_variant_exists() {
-        let _f = OutputFormat::Table;
-    }
-
-    #[test]
-    fn output_format_csv_variant_exists() {
-        let _f = OutputFormat::Csv;
-    }
-
-    #[test]
-    fn test_item_headers() {
-        assert_eq!(TestItem::headers(), vec!["ID", "Name"]);
-    }
-
-    #[test]
-    fn test_item_row() {
-        let item = make_item("1", "Alice");
-        assert_eq!(item.row(), vec!["1", "Alice"]);
-    }
-
-    #[test]
-    fn colored_row_default_returns_row() {
-        let item = make_item("42", "Bob");
-        assert_eq!(item.colored_row(true), item.row());
-        assert_eq!(item.colored_row(false), item.row());
-    }
-
-    #[test]
-    fn print_quiet_outputs_first_column() {
-        // Verify the logic: print_quiet iterates items and prints the first element of row()
-        let item = make_item("ticker-abc", "Some Market");
-        let row = item.row();
-        assert_eq!(row.first().unwrap(), "ticker-abc");
-    }
-
-    #[test]
-    fn print_csv_writes_header_and_rows() {
-        // Test CSV output using an in-memory writer to verify format
+    fn csv_output_has_header_and_data_rows() {
         let items = vec![make_item("1", "Alpha"), make_item("2", "Beta")];
         let mut wtr = csv::Writer::from_writer(Vec::new());
         wtr.write_record(TestItem::headers()).unwrap();
@@ -253,32 +206,34 @@ mod tests {
     }
 
     #[test]
-    fn output_quiet_takes_quiet_branch() {
-        // When quiet=true, output() should call print_quiet (returns Ok without hitting format)
-        let cfg = OutputConfig {
-            format: OutputFormat::Json,
-            no_pager: true,
-            color: false,
-            quiet: true,
-            yes: false,
-        };
+    fn quiet_mode_skips_format_dispatch() {
+        // quiet=true should succeed regardless of format
         let items = vec![make_item("x", "y")];
-        // This should not error — it takes the quiet branch, printing to stdout
-        let result = output(&items, &cfg);
-        assert!(result.is_ok());
+        assert!(output(&items, &cfg(OutputFormat::Json, true)).is_ok());
+        assert!(output(&items, &cfg(OutputFormat::Table, true)).is_ok());
+        assert!(output(&items, &cfg(OutputFormat::Csv, true)).is_ok());
     }
 
     #[test]
-    fn output_empty_items_quiet() {
-        let cfg = OutputConfig {
-            format: OutputFormat::Table,
-            no_pager: true,
-            color: false,
-            quiet: true,
-            yes: false,
-        };
+    fn json_output_produces_valid_json() {
+        let items = vec![make_item("abc", "Test Market")];
+        let json_str = serde_json::to_string_pretty(&items).unwrap();
+        let parsed: Vec<serde_json::Value> = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0]["id"], "abc");
+        assert_eq!(parsed[0]["name"], "Test Market");
+    }
+
+    #[test]
+    fn colored_row_default_delegates_to_row() {
+        let item = make_item("42", "Bob");
+        assert_eq!(item.colored_row(true), item.row());
+        assert_eq!(item.colored_row(false), item.row());
+    }
+
+    #[test]
+    fn table_output_empty_items_succeeds() {
         let items: Vec<TestItem> = vec![];
-        let result = output(&items, &cfg);
-        assert!(result.is_ok());
+        assert!(output(&items, &cfg(OutputFormat::Table, false)).is_ok());
     }
 }

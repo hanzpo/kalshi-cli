@@ -33,4 +33,5 @@ uuid = { version = "1", features = ["v4"] }
 rand = "0.9"
 
 [dev-dependencies]
+http = "1.4.0"
 tempfile = "3"

@@ -290,56 +290,129 @@ mod tests {
     }
 
     #[test]
-    fn prod_base_url_value() {
-        assert_eq!(
-            PROD_BASE_URL,
-            "https://api.elections.kalshi.com/trade-api/v2"
-        );
+    fn new_selects_demo_or_prod_url() {
+        let demo = KalshiClient::new(&empty_config(), true).unwrap();
+        assert_eq!(demo.base_url(), DEMO_BASE_URL);
+
+        let prod = KalshiClient::new(&empty_config(), false).unwrap();
+        assert_eq!(prod.base_url(), PROD_BASE_URL);
     }
 
     #[test]
-    fn demo_base_url_value() {
-        assert_eq!(DEMO_BASE_URL, "https://demo-api.kalshi.co/trade-api/v2");
-    }
-
-    #[test]
-    fn new_with_demo_true_uses_demo_url() {
-        let client = KalshiClient::new(&empty_config(), true).unwrap();
-        assert_eq!(client.base_url(), DEMO_BASE_URL);
-    }
-
-    #[test]
-    fn new_with_demo_false_uses_prod_url() {
-        let client = KalshiClient::new(&empty_config(), false).unwrap();
-        assert_eq!(client.base_url(), PROD_BASE_URL);
-    }
-
-    #[test]
-    fn new_with_empty_config_has_no_auth() {
+    fn new_without_credentials_has_no_auth() {
         let client = KalshiClient::new(&empty_config(), false).unwrap();
         assert!(!client.has_auth());
     }
 
     #[test]
-    fn require_auth_without_signer_returns_error() {
+    fn require_auth_fails_without_signer() {
         let client = KalshiClient::new(&empty_config(), false).unwrap();
-        let result = client.require_auth();
-        assert!(result.is_err());
+        let err = client.require_auth().unwrap_err();
+        assert!(err.to_string().contains("Authentication required"));
     }
 
     #[test]
-    fn url_construction_concatenates_base_and_path() {
+    fn host_extracts_base_from_prod_url() {
         let client = KalshiClient::new(&empty_config(), false).unwrap();
-        let expected = format!("{}/markets", PROD_BASE_URL);
-        let actual = format!("{}{}", client.base_url(), "/markets");
-        assert_eq!(actual, expected);
+        assert_eq!(client.host(), "https://api.elections.kalshi.com");
     }
 
     #[test]
-    fn url_construction_demo_with_path() {
+    fn host_extracts_base_from_demo_url() {
         let client = KalshiClient::new(&empty_config(), true).unwrap();
-        let expected = format!("{}/markets/ABC-123/orderbook", DEMO_BASE_URL);
-        let actual = format!("{}{}", client.base_url(), "/markets/ABC-123/orderbook");
-        assert_eq!(actual, expected);
+        assert_eq!(client.host(), "https://demo-api.kalshi.co");
+    }
+
+    #[tokio::test]
+    async fn parse_response_success_with_json_body() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let resp = http::Response::builder()
+            .status(200)
+            .body(r#"{"value": 42}"#)
+            .unwrap();
+        let resp = Response::from(resp);
+        let result: serde_json::Value = client.parse_response(resp).await.unwrap();
+        assert_eq!(result["value"], 42);
+    }
+
+    #[tokio::test]
+    async fn parse_response_success_with_empty_body() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let resp = http::Response::builder()
+            .status(200)
+            .body("")
+            .unwrap();
+        let resp = Response::from(resp);
+        // Empty body should parse as empty JSON object
+        let result: serde_json::Value = client.parse_response(resp).await.unwrap();
+        assert_eq!(result, serde_json::json!({}));
+    }
+
+    #[tokio::test]
+    async fn parse_response_api_error_with_structured_json() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let resp = http::Response::builder()
+            .status(403)
+            .body(r#"{"code": "FORBIDDEN", "message": "Not allowed"}"#)
+            .unwrap();
+        let resp = Response::from(resp);
+        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("403"));
+        assert!(msg.contains("Not allowed"));
+    }
+
+    #[tokio::test]
+    async fn parse_response_error_with_plain_text_body() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let resp = http::Response::builder()
+            .status(502)
+            .body("Bad Gateway upstream")
+            .unwrap();
+        let resp = Response::from(resp);
+        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        assert!(err.to_string().contains("Bad Gateway upstream"));
+    }
+
+    #[tokio::test]
+    async fn parse_response_error_with_empty_body_uses_reason() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let resp = http::Response::builder()
+            .status(404)
+            .body("")
+            .unwrap();
+        let resp = Response::from(resp);
+        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        assert!(err.to_string().contains("Not Found"));
+    }
+
+    #[tokio::test]
+    async fn throttle_enforces_minimum_interval() {
+        let client = KalshiClient::new(&empty_config(), false).unwrap();
+        let start = Instant::now();
+        client.throttle().await; // first call — no wait
+        client.throttle().await; // second call — should wait ~200ms
+        let elapsed = start.elapsed();
+        assert!(elapsed >= Duration::from_millis(180)); // allow small timing slack
+    }
+
+    #[test]
+    fn new_with_inline_pem_creates_signer() {
+        // Generate a test key
+        use rsa::RsaPrivateKey;
+        use rsa::pkcs8::{EncodePrivateKey, LineEnding};
+        let key = RsaPrivateKey::new(&mut rsa::rand_core::OsRng, 2048).unwrap();
+        let pem = key.to_pkcs8_pem(LineEnding::LF).unwrap().to_string();
+
+        let config = Config {
+            api_key_id: Some("test-key".to_string()),
+            private_key: Some(pem),
+            private_key_path: None,
+            default_output: None,
+            demo: None,
+            profiles: Default::default(),
+        };
+        let client = KalshiClient::new(&config, false).unwrap();
+        assert!(client.has_auth());
     }
 }
