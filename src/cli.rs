@@ -4,8 +4,19 @@ use clap::{Parser, Subcommand};
 
 use crate::output::OutputFormat;
 
+pub const BANNER: &str = "\
+\x1b[32m\
+\n ██╗  ██╗ █████╗ ██╗     ███████╗██╗  ██╗██╗\
+\n ██║ ██╔╝██╔══██╗██║     ██╔════╝██║  ██║██║\
+\n █████╔╝ ███████║██║     ███████╗███████║██║\
+\n ██╔═██╗ ██╔══██║██║     ╚════██║██╔══██║██║\
+\n ██║  ██╗██║  ██║███████╗███████║██║  ██║██║\
+\n ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝\
+\n              Trade on anything.\
+\n\x1b[0m";
+
 #[derive(Parser)]
-#[command(name = "kalshi", about = "CLI for the Kalshi prediction market API", version)]
+#[command(name = "kalshi", about = "CLI for the Kalshi prediction market API", version, before_help = BANNER)]
 pub struct Cli {
     /// Use demo/sandbox environment
     #[arg(long, global = true)]
