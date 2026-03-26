@@ -3,13 +3,17 @@ name = "kalshi-cli"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "kalshi"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.13", features = ["json", "query"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1.1"
 dirs = "6"
 rsa = "0.9"
 sha2 = "0.10"
@@ -19,12 +23,11 @@ thiserror = "2"
 comfy-table = "7"
 chrono = { version = "0.4", features = ["serde"] }
 url = "2"
-rand = "0.8"
 crossterm = "0.29"
 terminal_size = "0.4"
 csv = "1.3"
 clap_complete = "4"
-tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
 

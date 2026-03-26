@@ -4,10 +4,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use rand::rngs::OsRng;
 use rsa::RsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::pss::BlindedSigningKey;
+use rsa::rand_core::OsRng;
 use rsa::signature::{RandomizedSigner, SignatureEncoding};
 use sha2::Sha256;
 
