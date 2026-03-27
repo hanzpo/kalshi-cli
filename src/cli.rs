@@ -202,6 +202,11 @@ pub enum Command {
     },
 
     // ── Utilities ──
+    /// Get the market ticker(s) from a Kalshi website URL
+    Ticker {
+        /// Kalshi market URL (e.g. https://kalshi.com/markets/kxmarmad/march-madness-2026/kxmarmad-26)
+        url: String,
+    },
     /// Get the Kalshi website URL for a market ticker
     Url {
         /// Market ticker (e.g. KXMARMAD-26-DUKE)

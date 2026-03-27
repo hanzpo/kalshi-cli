@@ -23,5 +23,6 @@ pub mod status;
 pub mod structured_target;
 pub mod subaccounts;
 pub mod trade;
+pub mod ticker;
 pub mod url;
 pub mod watch;
