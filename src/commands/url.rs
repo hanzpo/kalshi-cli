@@ -2,26 +2,32 @@ use anyhow::{Result, bail};
 use std::process::Command;
 
 use crate::client::KalshiClient;
-use crate::models::event::EventResponse;
+use crate::error::KalshiError;
+use crate::models::market::MarketResponse;
+use crate::models::series::SeriesResponse;
 
-/// Split a ticker into (series_ticker, event_ticker).
+/// Extract the series ticker from a full ticker.
 ///
-/// Finds the first numeric segment to identify the boundary:
-/// - "KXMARMAD-26-DUKE" → series="KXMARMAD", event="KXMARMAD-26"
-/// - "KXMARMAD-26"      → series="KXMARMAD", event="KXMARMAD-26"
-fn parse_ticker(ticker: &str) -> Option<(String, String)> {
+/// The series is everything before the first segment that starts with a digit:
+/// - "KXMARMAD-26-DUKE"              → "KXMARMAD"
+/// - "KXMLBGAME-26MAR271907ATHTOR"   → "KXMLBGAME"
+/// - "INX-SPX-26MAR28-5720"          → "INX-SPX"
+fn parse_series(ticker: &str) -> Option<String> {
+    if ticker.is_empty() {
+        return None;
+    }
     let parts: Vec<&str> = ticker.split('-').collect();
     for (i, part) in parts.iter().enumerate() {
-        if part.chars().all(|c| c.is_ascii_digit()) && !part.is_empty() {
+        if !part.is_empty() && part.starts_with(|c: char| c.is_ascii_digit()) {
             let series = parts[..i].join("-");
-            let event = parts[..=i].join("-");
             if series.is_empty() {
                 return None;
             }
-            return Some((series, event));
+            return Some(series);
         }
     }
-    None
+    // No numeric segment found — the whole ticker is the series (e.g. "KXCOMPANYACTIONLAYOFF")
+    Some(ticker.to_string())
 }
 
 /// Convert a string into a URL-safe slug: lowercase, strip special chars, whitespace → hyphens.
@@ -46,29 +52,41 @@ fn slugify(s: &str) -> String {
 }
 
 pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<()> {
-    let (series_ticker, event_ticker) = parse_ticker(ticker).ok_or_else(|| {
+    // Try fetching as a market ticker first; if 404, treat input as an event ticker
+    let event_ticker = match client
+        .get::<MarketResponse>(&format!("/markets/{}", ticker), &[])
+        .await
+    {
+        Ok(resp) => resp
+            .market
+            .event_ticker
+            .unwrap_or_else(|| ticker.to_string()),
+        Err(e) => {
+            if let Some(KalshiError::Api { status: 404, .. }) = e.downcast_ref::<KalshiError>() {
+                ticker.to_string()
+            } else {
+                return Err(e);
+            }
+        }
+    };
+
+    let series_ticker = parse_series(&event_ticker).ok_or_else(|| {
         anyhow::anyhow!(
-            "Could not parse ticker '{}' — expected format like KXMARMAD-26-DUKE",
-            ticker
+            "Could not parse ticker '{}' — expected format like KXMARMAD-26",
+            event_ticker
         )
     })?;
 
-    // Fetch the event to get its sub_title for the URL slug
-    let path = format!("/events/{}", event_ticker);
-    let resp: EventResponse = client.get(&path, &[]).await?;
-    let event = &resp.event;
+    // Fetch the series to get its title for the URL slug
+    let series_path = format!("/series/{}", series_ticker);
+    let series_resp: SeriesResponse = client.get(&series_path, &[]).await?;
+    let series = &series_resp.series;
 
-    let sub_title = event
-        .extra
-        .get("sub_title")
-        .and_then(|v| v.as_str())
-        .or(event.title.as_deref());
-
-    let slug = match sub_title {
+    let slug = match series.title.as_deref() {
         Some(title) => slugify(title),
         None => bail!(
-            "Event '{}' has no title to build URL slug from",
-            event_ticker
+            "Series '{}' has no title to build URL slug from",
+            series_ticker
         ),
     };
 
@@ -98,37 +116,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_ticker_full_market() {
-        let (series, event) = parse_ticker("KXMARMAD-26-DUKE").unwrap();
-        assert_eq!(series, "KXMARMAD");
-        assert_eq!(event, "KXMARMAD-26");
+    fn parse_series_full_market() {
+        assert_eq!(parse_series("KXMARMAD-26-DUKE").unwrap(), "KXMARMAD");
     }
 
     #[test]
-    fn parse_ticker_event_only() {
-        let (series, event) = parse_ticker("KXMARMAD-26").unwrap();
-        assert_eq!(series, "KXMARMAD");
-        assert_eq!(event, "KXMARMAD-26");
+    fn parse_series_event_only() {
+        assert_eq!(parse_series("KXMARMAD-26").unwrap(), "KXMARMAD");
     }
 
     #[test]
-    fn parse_ticker_multi_part_series() {
-        let (series, event) = parse_ticker("INX-SPX-26MAR28-5720").unwrap();
-        // First numeric segment: unclear — let's check
-        // parts: ["INX", "SPX", "26MAR28", "5720"]
-        // "26MAR28" is NOT all digits, "5720" IS
-        assert_eq!(series, "INX-SPX-26MAR28");
-        assert_eq!(event, "INX-SPX-26MAR28-5720");
+    fn parse_series_multi_part() {
+        assert_eq!(parse_series("INX-SPX-26MAR28-5720").unwrap(), "INX-SPX");
     }
 
     #[test]
-    fn parse_ticker_no_numeric() {
-        assert!(parse_ticker("KXMARMAD").is_none());
+    fn parse_series_no_pure_numeric_segment() {
+        assert_eq!(
+            parse_series("KXMLBGAME-26MAR271907ATHTOR").unwrap(),
+            "KXMLBGAME"
+        );
     }
 
     #[test]
-    fn parse_ticker_starts_with_number() {
-        assert!(parse_ticker("26-FOO").is_none());
+    fn parse_series_no_numeric() {
+        assert_eq!(parse_series("KXCOMPANYACTIONLAYOFF").unwrap(), "KXCOMPANYACTIONLAYOFF");
+    }
+
+    #[test]
+    fn parse_series_empty() {
+        assert!(parse_series("").is_none());
+    }
+
+    #[test]
+    fn parse_series_starts_with_number() {
+        assert!(parse_series("26-FOO").is_none());
     }
 
     #[test]
