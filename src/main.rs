@@ -3,6 +3,7 @@ mod auth;
 mod browse;
 mod cli;
 mod client;
+mod color;
 mod commands;
 mod config;
 mod confirm;

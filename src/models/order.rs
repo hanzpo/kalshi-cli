@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::color;
 use crate::models::common::format_opt;
 use crate::output::TableDisplay;
 
@@ -153,6 +154,14 @@ impl TableDisplay for Order {
             format_opt(&self.remaining_count),
             format_opt(&self.created_time),
         ]
+    }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref status) = self.status {
+            row[4] = color::color_order_status(status, c);
+        }
+        row
     }
 }
 

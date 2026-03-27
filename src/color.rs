@@ -40,6 +40,47 @@ pub fn color_pnl(cents: i64, enabled: bool) -> String {
     }
 }
 
+pub fn color_result(result: &str, enabled: bool) -> String {
+    match result.to_lowercase().as_str() {
+        "yes" => green(result, enabled),
+        "no" => red(result, enabled),
+        _ => result.to_string(),
+    }
+}
+
+pub fn color_order_status(status: &str, enabled: bool) -> String {
+    match status.to_lowercase().as_str() {
+        "resting" | "pending" => yellow(status, enabled),
+        "executed" | "filled" => green(status, enabled),
+        "canceled" | "cancelled" => red(status, enabled),
+        _ => status.to_string(),
+    }
+}
+
+pub fn color_side(side: &str, enabled: bool) -> String {
+    match side.to_lowercase().as_str() {
+        "yes" => green(side, enabled),
+        "no" => red(side, enabled),
+        _ => side.to_string(),
+    }
+}
+
+pub fn color_action(action: &str, enabled: bool) -> String {
+    match action.to_lowercase().as_str() {
+        "buy" => green(action, enabled),
+        "sell" => red(action, enabled),
+        _ => action.to_string(),
+    }
+}
+
+pub fn color_bool(val: bool, enabled: bool) -> String {
+    if val {
+        green(&val.to_string(), enabled)
+    } else {
+        red(&val.to_string(), enabled)
+    }
+}
+
 pub fn color_status(status: &str, enabled: bool) -> String {
     match status.to_lowercase().as_str() {
         "open" | "active" => green(status, enabled),

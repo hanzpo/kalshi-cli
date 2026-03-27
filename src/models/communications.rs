@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::color;
 use crate::models::common::format_opt;
 use crate::output::TableDisplay;
 
@@ -48,6 +49,17 @@ impl TableDisplay for Rfq {
             format_opt(&self.created_time),
         ]
     }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref side) = self.side {
+            row[2] = color::color_side(side, c);
+        }
+        if let Some(ref status) = self.status {
+            row[4] = color::color_status(status, c);
+        }
+        row
+    }
 }
 
 // Quote
@@ -91,6 +103,14 @@ impl TableDisplay for Quote {
             format_opt(&self.status),
             format_opt(&self.created_time),
         ]
+    }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref status) = self.status {
+            row[3] = color::color_order_status(status, c);
+        }
+        row
     }
 }
 

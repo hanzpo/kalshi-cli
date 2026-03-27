@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::color;
 use crate::output::TableDisplay;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,15 @@ impl TableDisplay for ExchangeStatus {
                 .map_or("-".to_string(), |v| v.to_string()),
             self.trading_active
                 .map_or("-".to_string(), |v| v.to_string()),
+        ]
+    }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        vec![
+            self.exchange_active
+                .map_or("-".to_string(), |v| color::color_bool(v, c)),
+            self.trading_active
+                .map_or("-".to_string(), |v| color::color_bool(v, c)),
         ]
     }
 }

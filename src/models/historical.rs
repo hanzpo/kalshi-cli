@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::color;
 use crate::models::common::format_opt;
 use crate::output::TableDisplay;
 
@@ -44,6 +45,17 @@ impl TableDisplay for HistoricalMarket {
             format_opt(&self.close_time),
             format_opt(&self.result),
         ]
+    }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref status) = self.status {
+            row[2] = color::color_status(status, c);
+        }
+        if let Some(ref result) = self.result {
+            row[4] = color::color_result(result, c);
+        }
+        row
     }
 }
 

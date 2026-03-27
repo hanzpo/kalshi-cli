@@ -222,7 +222,11 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 let items = resp.current_page.unwrap_or_default();
                 let has_more = resp.next_cursor.as_ref().is_some_and(|c| !c.is_empty());
                 if let Some(total) = resp.total_results_count {
-                    eprintln!("{} results found", total);
+                    if total >= 250 {
+                        eprintln!("250+ results found");
+                    } else {
+                        eprintln!("{} results found", total);
+                    }
                 }
                 output_paginated(&items, has_more, format)?;
             }

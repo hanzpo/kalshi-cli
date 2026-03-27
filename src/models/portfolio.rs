@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::color;
 use crate::models::common::format_opt;
 use crate::output::TableDisplay;
 
@@ -76,6 +77,14 @@ impl TableDisplay for Position {
             format_opt(&self.total_traded),
         ]
     }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(pnl) = self.realized_pnl {
+            row[3] = color::color_pnl(pnl, c);
+        }
+        row
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +138,17 @@ impl TableDisplay for Fill {
             format_opt(&self.created_time),
         ]
     }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref side) = self.side {
+            row[2] = color::color_side(side, c);
+        }
+        if let Some(ref action) = self.action {
+            row[3] = color::color_action(action, c);
+        }
+        row
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +193,17 @@ impl TableDisplay for Settlement {
             format_opt(&self.fee_cost),
             format_opt(&self.settled_time),
         ]
+    }
+
+    fn colored_row(&self, c: bool) -> Vec<String> {
+        let mut row = self.row();
+        if let Some(ref result) = self.market_result {
+            row[1] = color::color_result(result, c);
+        }
+        if let Some(revenue) = self.revenue {
+            row[4] = color::color_pnl(revenue, c);
+        }
+        row
     }
 }
 
