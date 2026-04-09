@@ -81,6 +81,49 @@ pub fn color_bool(val: bool, enabled: bool) -> String {
     }
 }
 
+/// Color text using a heat-gradient based on a 0.0–1.0 ratio (position in the palette).
+/// The gradient goes: green → yellow-green → yellow → orange → magenta.
+pub fn color_heat(text: &str, ratio: f64, enabled: bool) -> String {
+    use crossterm::style::Color;
+
+    if !enabled || text.is_empty() {
+        return text.to_string();
+    }
+
+    let t = ratio.clamp(0.0, 1.0);
+
+    // 5-stop gradient: green(0) → chartreuse(0.25) → yellow(0.5) → orange(0.75) → magenta(1.0)
+    let (r, g, b) = if t < 0.25 {
+        let s = t / 0.25;
+        lerp_rgb((80, 220, 50), (180, 230, 30), s)
+    } else if t < 0.5 {
+        let s = (t - 0.25) / 0.25;
+        lerp_rgb((180, 230, 30), (255, 220, 0), s)
+    } else if t < 0.75 {
+        let s = (t - 0.5) / 0.25;
+        lerp_rgb((255, 220, 0), (255, 160, 30), s)
+    } else {
+        let s = (t - 0.75) / 0.25;
+        lerp_rgb((255, 160, 30), (230, 30, 160), s)
+    };
+
+    let colored = crossterm::style::style(text).with(Color::Rgb { r, g, b });
+    colored.to_string()
+}
+
+/// Dim/gray text for de-emphasized values.
+pub fn dim(text: &str, enabled: bool) -> String {
+    if !enabled {
+        return text.to_string();
+    }
+    text.dark_grey().to_string()
+}
+
+fn lerp_rgb(a: (u8, u8, u8), b: (u8, u8, u8), t: f64) -> (u8, u8, u8) {
+    let l = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).round() as u8;
+    (l(a.0, b.0), l(a.1, b.1), l(a.2, b.2))
+}
+
 pub fn color_status(status: &str, enabled: bool) -> String {
     match status.to_lowercase().as_str() {
         "open" | "active" => green(status, enabled),

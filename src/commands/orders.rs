@@ -4,8 +4,8 @@ use crate::cli::OrderCmd;
 use crate::client::KalshiClient;
 use crate::models::order::{
     AmendOrderRequest, BatchCancelRequest, BatchCancelResponse, BatchCreateRequest,
-    BatchCreateResponse, CreateOrderRequest, DecreaseOrderRequest, OrderResponse, OrdersResponse,
-    QueuePositionsResponse,
+    BatchCreateResponse, CreateOrderRequest, DecreaseOrderRequest, Order, OrderResponse,
+    OrdersResponse, QueuePositionsResponse,
 };
 use crate::output::{OutputConfig, output, output_one, print_json};
 use crate::pagination::paginated_list;
@@ -126,7 +126,13 @@ pub async fn execute(client: &KalshiClient, cmd: OrderCmd, out: &OutputConfig) -
             }
             let req = BatchCreateRequest { orders };
             let resp: BatchCreateResponse = client.post("/portfolio/orders/batched", &req).await?;
-            output(&resp.orders.unwrap_or_default(), out)?;
+            let orders: Vec<Order> = resp
+                .orders
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|w| w.order)
+                .collect();
+            output(&orders, out)?;
         }
         OrderCmd::BatchCancel { ticker, order_ids } => {
             let req = BatchCancelRequest { ticker, order_ids };

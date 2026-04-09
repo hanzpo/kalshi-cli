@@ -248,12 +248,12 @@ impl KalshiClient {
             let body = resp.text().await.unwrap_or_default();
 
             if let Ok(api_err) = serde_json::from_str::<ApiErrorResponse>(&body) {
+                let (code, message) = api_err.into_parts();
                 bail!(KalshiError::Api {
                     status: status_code,
-                    message: api_err
-                        .message
+                    message: message
                         .unwrap_or_else(|| "Unknown error".to_string()),
-                    code: api_err.code,
+                    code,
                 });
             }
 

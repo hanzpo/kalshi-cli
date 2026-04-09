@@ -22,7 +22,7 @@ pub async fn execute(client: &KalshiClient, cmd: SeriesCmd, out: &OutputConfig) 
             .await?;
         }
         SeriesCmd::Get { series_ticker } => {
-            let path = format!("/series/{}", series_ticker);
+            let path = format!("/series/{}", series_ticker.to_uppercase());
             let resp: SeriesResponse = client.get(&path, &[]).await?;
             output_one(&resp.series, out)?;
         }

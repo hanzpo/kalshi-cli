@@ -26,7 +26,7 @@ pub async fn execute_buy(
         "Buy {} {} @ {} on {}?",
         quantity, side, price_display, ticker
     );
-    if !confirm::confirm(&msg, false)? {
+    if !confirm::confirm(&msg, out.yes)? {
         eprintln!("Cancelled.");
         return Ok(());
     }
@@ -70,7 +70,7 @@ pub async fn execute_sell(
         "Sell {} {} @ {} on {}?",
         quantity, side, price_display, ticker
     );
-    if !confirm::confirm(&msg, false)? {
+    if !confirm::confirm(&msg, out.yes)? {
         eprintln!("Cancelled.");
         return Ok(());
     }
@@ -116,14 +116,14 @@ pub async fn execute_close(client: &KalshiClient, ticker: &str, out: &OutputConf
         None => bail!("No open position found for {}", ticker),
     };
 
-    let count = pos.position.unwrap_or(0);
+    let count = pos.position.unwrap_or(0.0) as i64;
     if count == 0 {
         eprintln!("Position is already flat on {}", ticker);
         return Ok(());
     }
 
     let msg = format!("Close position of {} on {}?", count, ticker);
-    if !confirm::confirm(&msg, false)? {
+    if !confirm::confirm(&msg, out.yes)? {
         eprintln!("Cancelled.");
         return Ok(());
     }
@@ -159,7 +159,7 @@ pub async fn execute_close(client: &KalshiClient, ticker: &str, out: &OutputConf
 pub async fn execute_cancel_all(
     client: &KalshiClient,
     ticker_filter: Option<&str>,
-    _out: &OutputConfig,
+    out: &OutputConfig,
 ) -> Result<()> {
     client.require_auth()?;
 
@@ -168,7 +168,7 @@ pub async fn execute_cancel_all(
         None => "Cancel all resting orders?".to_string(),
     };
 
-    if !confirm::confirm(&msg, false)? {
+    if !confirm::confirm(&msg, out.yes)? {
         eprintln!("Cancelled.");
         return Ok(());
     }

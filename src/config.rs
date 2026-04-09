@@ -67,9 +67,11 @@ impl Config {
             }
             if let Some(ref v) = profile.private_key_path {
                 self.private_key_path = Some(v.clone());
+                self.private_key = None; // clear inline key when path is set
             }
             if let Some(ref v) = profile.private_key {
                 self.private_key = Some(v.clone());
+                self.private_key_path = None; // clear path when inline key is set
             }
             if let Some(v) = profile.demo {
                 self.demo = Some(v);

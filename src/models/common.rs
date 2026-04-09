@@ -55,6 +55,34 @@ impl std::fmt::Display for TimeInForce {
     }
 }
 
+/// Serde helper: deserialize a JSON value that may be a number or a numeric string into an f64.
+/// Handles the Kalshi API's inconsistent typing of numeric fields.
+pub mod flexible_f64 {
+    use serde::{self, Deserialize, Deserializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let val: Option<serde_json::Value> = Option::deserialize(deserializer)?;
+        match val {
+            None | Some(serde_json::Value::Null) => Ok(None),
+            Some(serde_json::Value::Number(n)) => Ok(n.as_f64()),
+            Some(serde_json::Value::String(s)) => {
+                if s.is_empty() {
+                    Ok(None)
+                } else {
+                    s.parse::<f64>().map(Some).map_err(serde::de::Error::custom)
+                }
+            }
+            Some(other) => Err(serde::de::Error::custom(format!(
+                "expected number or string, got {:?}",
+                other
+            ))),
+        }
+    }
+}
+
 /// Format an optional field
 pub fn format_opt<T: std::fmt::Display>(val: &Option<T>) -> String {
     match val {
@@ -62,6 +90,7 @@ pub fn format_opt<T: std::fmt::Display>(val: &Option<T>) -> String {
         None => "-".to_string(),
     }
 }
+
 
 #[cfg(test)]
 mod tests {

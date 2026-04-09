@@ -48,7 +48,17 @@ where
     F: Fn(u32, Option<String>) -> Fut,
     Fut: Future<Output = Result<(Vec<T>, Option<String>)>>,
 {
-    if all {
+    if all && format.is_non_interactive() {
+        // Non-interactive --all: fetch everything and dump to stdout
+        let opts = PaginationOpts {
+            limit: None,
+            cursor,
+            all: true,
+            max_page_size: max_page_size,
+        };
+        let result = auto_paginate(&opts, fetcher).await?;
+        output_paginated(&result.items, result.has_more, format)
+    } else if all {
         let page_size = BROWSE_PAGE_SIZE as usize;
         let initial_cursor = cursor;
         // Buffer for overflow when API returns more items than one display page.

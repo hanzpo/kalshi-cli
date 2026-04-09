@@ -18,7 +18,7 @@ pub async fn execute(client: &KalshiClient, cmd: SubaccountCmd, out: &OutputConf
                 client.post("/portfolio/subaccounts", &req).await?;
             println!(
                 "Subaccount created with ID: {}",
-                resp.subaccount_id.unwrap_or(0)
+                resp.subaccount_id.unwrap_or(0.0) as i64
             );
         }
         SubaccountCmd::Transfer { from, to, amount } => {

@@ -54,7 +54,7 @@ fn slugify(s: &str) -> String {
 pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<()> {
     // Try fetching as a market ticker first; if 404, treat input as an event ticker
     let event_ticker = match client
-        .get::<MarketResponse>(&format!("/markets/{}", ticker), &[])
+        .get::<MarketResponse>(&format!("/markets/{}", ticker.to_uppercase()), &[])
         .await
     {
         Ok(resp) => resp
@@ -78,7 +78,7 @@ pub async fn execute(client: &KalshiClient, ticker: &str, open: bool) -> Result<
     })?;
 
     // Fetch the series to get its title for the URL slug
-    let series_path = format!("/series/{}", series_ticker);
+    let series_path = format!("/series/{}", series_ticker.to_uppercase());
     let series_resp: SeriesResponse = client.get(&series_path, &[]).await?;
     let series = &series_resp.series;
 

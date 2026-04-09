@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::color;
-use crate::models::common::format_opt;
+use crate::models::common::{flexible_f64, format_opt};
 use crate::output::TableDisplay;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -69,17 +69,22 @@ pub struct Order {
     pub status: Option<String>,
     pub side: Option<String>,
     pub action: Option<String>,
-    pub yes_price: Option<i64>,
-    pub no_price: Option<i64>,
-    pub count: Option<i64>,
-    pub remaining_count: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub yes_price: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub no_price: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub count: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub remaining_count: Option<f64>,
     pub created_time: Option<String>,
     pub updated_time: Option<String>,
     pub expiration_time: Option<String>,
     pub client_order_id: Option<String>,
     #[serde(rename = "type")]
     pub order_type: Option<String>,
-    pub queue_position: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub queue_position: Option<f64>,
     #[serde(flatten)]
     pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -96,8 +101,15 @@ pub struct OrdersResponse {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct BatchCreateOrderWrapper {
+    pub order: Option<Order>,
+    #[serde(flatten)]
+    _extra: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct BatchCreateResponse {
-    pub orders: Option<Vec<Order>>,
+    pub orders: Option<Vec<BatchCreateOrderWrapper>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +145,26 @@ impl TableDisplay for Order {
     }
 
     fn row(&self) -> Vec<String> {
+        let yes_price = self.yes_price.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("yes_price_dollars")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
+        let no_price = self.no_price.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("no_price_dollars")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
+        let count = self.count.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("initial_count_fp")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
+        let remaining = self.remaining_count.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("remaining_count_fp")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
         vec![
             self.order_id
                 .as_ref()
@@ -148,10 +180,10 @@ impl TableDisplay for Order {
             format_opt(&self.side),
             format_opt(&self.action),
             format_opt(&self.status),
-            self.yes_price.map_or("-".into(), |v| format!("{}", v)),
-            self.no_price.map_or("-".into(), |v| format!("{}", v)),
-            format_opt(&self.count),
-            format_opt(&self.remaining_count),
+            format_opt(&yes_price),
+            format_opt(&no_price),
+            format_opt(&count),
+            format_opt(&remaining),
             format_opt(&self.created_time),
         ]
     }
@@ -176,10 +208,10 @@ mod tests {
             status: Some("resting".to_string()),
             side: Some("yes".to_string()),
             action: Some("buy".to_string()),
-            yes_price: Some(65),
-            no_price: Some(35),
-            count: Some(10),
-            remaining_count: Some(5),
+            yes_price: Some(65.0),
+            no_price: Some(35.0),
+            count: Some(10.0),
+            remaining_count: Some(5.0),
             created_time: Some("2026-01-01T00:00:00Z".to_string()),
             updated_time: None,
             expiration_time: None,

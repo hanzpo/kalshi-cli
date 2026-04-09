@@ -37,7 +37,7 @@ pub async fn execute(client: &KalshiClient, cmd: CollectionCmd, out: &OutputConf
             print_json(&resp, out.no_pager)?;
         }
         CollectionCmd::Get { ticker } => {
-            let path = format!("/multivariate_event_collections/{}", ticker);
+            let path = format!("/multivariate_event_collections/{}", ticker.to_uppercase());
             let resp: serde_json::Value = client.get(&path, &[]).await?;
             print_json(&resp, out.no_pager)?;
         }
@@ -55,7 +55,7 @@ pub async fn execute(client: &KalshiClient, cmd: CollectionCmd, out: &OutputConf
                 "selected_markets": selected_markets,
                 "with_market_payload": with_market_payload,
             });
-            let path = format!("/multivariate_event_collections/{}", ticker);
+            let path = format!("/multivariate_event_collections/{}", ticker.to_uppercase());
             let resp: serde_json::Value = client.post(&path, &body).await?;
             print_json(&resp, out.no_pager)?;
         }
@@ -68,7 +68,7 @@ pub async fn execute(client: &KalshiClient, cmd: CollectionCmd, out: &OutputConf
             let body = serde_json::json!({
                 "selected_markets": selected_markets,
             });
-            let path = format!("/multivariate_event_collections/{}/lookup", ticker);
+            let path = format!("/multivariate_event_collections/{}/lookup", ticker.to_uppercase());
             let resp: serde_json::Value = client.put(&path, &body).await?;
             print_json(&resp, out.no_pager)?;
         }
@@ -76,7 +76,7 @@ pub async fn execute(client: &KalshiClient, cmd: CollectionCmd, out: &OutputConf
             ticker,
             lookback_seconds,
         } => {
-            let path = format!("/multivariate_event_collections/{}/lookup", ticker);
+            let path = format!("/multivariate_event_collections/{}/lookup", ticker.to_uppercase());
             let mut query = Vec::new();
             let lookback_str = lookback_seconds.map(|l| l.to_string());
             if let Some(ref l) = lookback_str {

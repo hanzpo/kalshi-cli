@@ -84,12 +84,14 @@ pub async fn execute(client: &KalshiClient, cmd: HistoricalCmd, out: &OutputConf
             start_ts,
             end_ts,
         } => {
-            let path = format!("/historical/markets/{}/candlesticks", ticker);
+            let path = format!("/historical/markets/{}/candlesticks", ticker.to_uppercase());
             let mut query = Vec::new();
             let series_str = series_ticker;
             let period_str = period.map(|p| p.to_string());
-            let start_str = start_ts.map(|t| t.to_string());
-            let end_str = end_ts.map(|t| t.to_string());
+            // Default to last 7 days if not specified (API requires both)
+            let now = chrono::Utc::now().timestamp();
+            let start_str = Some(start_ts.unwrap_or(now - 7 * 24 * 3600).to_string());
+            let end_str = Some(end_ts.unwrap_or(now).to_string());
 
             query.push(("series_ticker", series_str.as_str()));
             if let Some(ref p) = period_str {
@@ -163,7 +165,7 @@ pub async fn execute(client: &KalshiClient, cmd: HistoricalCmd, out: &OutputConf
             .await?;
         }
         HistoricalCmd::MarketDetail { ticker } => {
-            let path = format!("/historical/markets/{}", ticker);
+            let path = format!("/historical/markets/{}", ticker.to_uppercase());
             let resp: serde_json::Value = client.get(&path, &[]).await?;
             print_json(&resp, out.no_pager)?;
         }

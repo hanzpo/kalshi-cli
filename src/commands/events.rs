@@ -51,7 +51,7 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
             event_ticker,
             with_nested_markets,
         } => {
-            let path = format!("/events/{}", event_ticker);
+            let path = format!("/events/{}", event_ticker.to_uppercase());
             let mut query = Vec::new();
             if with_nested_markets {
                 query.push(("with_nested_markets", "true"));
@@ -60,7 +60,7 @@ pub async fn execute(client: &KalshiClient, cmd: EventCmd, out: &OutputConfig) -
             output_one(&resp.event, out)?;
         }
         EventCmd::Metadata { event_ticker } => {
-            let path = format!("/events/{}/metadata", event_ticker);
+            let path = format!("/events/{}/metadata", event_ticker.to_uppercase());
             let resp: serde_json::Value = client.get(&path, &[]).await?;
             print_json(&resp, out.no_pager)?;
         }

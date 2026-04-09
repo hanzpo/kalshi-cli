@@ -19,6 +19,15 @@ pub struct OutputConfig {
     pub no_pager: bool,
     pub color: bool,
     pub quiet: bool,
+    pub yes: bool,
+}
+
+impl OutputConfig {
+    /// Returns true when output should be non-interactive (no browser).
+    /// True for Json/Csv formats, quiet mode, or when stdout is not a TTY.
+    pub fn is_non_interactive(&self) -> bool {
+        !matches!(self.format, OutputFormat::Table) || self.quiet || !io::stdout().is_terminal()
+    }
 }
 
 pub trait TableDisplay {
@@ -184,6 +193,7 @@ mod tests {
             no_pager: true,
             color: false,
             quiet,
+            yes: false,
         }
     }
 

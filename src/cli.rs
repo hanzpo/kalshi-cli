@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::output::OutputFormat;
 
+
 pub const BANNER: &str = "\
 \x1b[32m\
 \n ██╗  ██╗ █████╗ ██╗     ███████╗██╗  ██╗██╗\
@@ -325,11 +326,14 @@ pub enum MarketCmd {
         status: Option<String>,
         #[arg(long)]
         series_ticker: Option<String>,
-        #[arg(long)]
+        #[arg(long, alias = "event")]
         event_ticker: Option<String>,
         /// Include combo/multivariate markets (excluded by default)
         #[arg(long)]
         include_combos: bool,
+        /// Filter results by keyword (case-insensitive match on title and ticker)
+        #[arg(long)]
+        search: Option<String>,
     },
     /// Get a single market
     Get {
@@ -339,7 +343,7 @@ pub enum MarketCmd {
     /// Get market trades
     #[command(alias = "trades")]
     Trade {
-        #[arg(long)]
+        /// Market ticker (optional — omit to list all trades)
         ticker: Option<String>,
         #[arg(long)]
         limit: Option<u32>,
@@ -418,6 +422,9 @@ pub enum MarketCmd {
         /// Hours from now
         #[arg(long, default_value = "24")]
         within: u64,
+        /// Max results to show
+        #[arg(long)]
+        limit: Option<u32>,
         /// Include combo/multivariate markets (excluded by default)
         #[arg(long)]
         include_combos: bool,
@@ -440,6 +447,24 @@ pub enum MarketCmd {
         /// Simulate selling N contracts
         #[arg(long)]
         sell: Option<i64>,
+    },
+    /// Show implied probability distribution for an event's markets
+    #[command(alias = "distribution")]
+    Dist {
+        /// Event ticker (e.g. KXFEDRATE-26APR)
+        event_ticker: String,
+        /// Show as CDF (cumulative) instead of PDF
+        #[arg(long)]
+        cdf: bool,
+        /// Chart width in columns
+        #[arg(long, default_value = "40")]
+        width: usize,
+        /// Use ask prices (default: midpoint of bid/ask)
+        #[arg(long)]
+        ask: bool,
+        /// Use bid prices (default: midpoint of bid/ask)
+        #[arg(long)]
+        bid: bool,
     },
 }
 
@@ -750,7 +775,7 @@ pub enum PortfolioCmd {
         all: bool,
         #[arg(long)]
         ticker: Option<String>,
-        #[arg(long)]
+        #[arg(long, alias = "event")]
         event_ticker: Option<String>,
         #[arg(long)]
         count_filter: Option<String>,
@@ -813,7 +838,7 @@ pub enum HistoricalCmd {
         #[arg(long)]
         max_close_ts: Option<i64>,
     },
-    /// List historical trades
+    /// List trades on settled markets (for active market trades, use `market trade`)
     #[command(alias = "trades")]
     Trade {
         #[arg(long)]
@@ -1162,7 +1187,7 @@ pub enum FcmCmd {
         cursor: Option<String>,
         #[arg(long)]
         all: bool,
-        #[arg(long)]
+        #[arg(long, alias = "event")]
         event_ticker: Option<String>,
         #[arg(long)]
         ticker: Option<String>,
@@ -1183,7 +1208,7 @@ pub enum FcmCmd {
         subtrader_id: String,
         #[arg(long)]
         ticker: Option<String>,
-        #[arg(long)]
+        #[arg(long, alias = "event")]
         event_ticker: Option<String>,
         #[arg(long)]
         count_filter: Option<String>,
@@ -1271,24 +1296,24 @@ pub enum ExportCmd {
         #[arg(long)]
         since: Option<i64>,
         /// Output file path
-        #[arg(short, long)]
-        output: PathBuf,
+        #[arg(short = 'o', long = "file")]
+        file: PathBuf,
     },
     /// Export positions
     #[command(alias = "positions")]
     Position {
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
-        #[arg(short, long)]
-        output: PathBuf,
+        #[arg(short = 'o', long = "file")]
+        file: PathBuf,
     },
     /// Export settlements
     #[command(alias = "settlements")]
     Settlement {
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
-        #[arg(short, long)]
-        output: PathBuf,
+        #[arg(short = 'o', long = "file")]
+        file: PathBuf,
     },
 }
 

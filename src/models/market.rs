@@ -73,6 +73,10 @@ impl TableDisplay for Market {
     }
 
     fn row(&self) -> Vec<String> {
+        let extra_str = |key: &str| -> Option<String> {
+            self.extra.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+        };
+
         vec![
             format_opt(&self.ticker),
             self.title
@@ -87,11 +91,21 @@ impl TableDisplay for Market {
                 })
                 .unwrap_or_else(|| "-".to_string()),
             format_opt(&self.status),
-            self.yes_bid.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.yes_ask.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.last_price.map_or("-".into(), |v| format!("{:.2}", v)),
-            format_opt(&self.volume),
-            format_opt(&self.open_interest),
+            self.yes_bid.map(|v| format!("{:.2}", v))
+                .or_else(|| extra_str("yes_bid_dollars").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}¢", v * 100.0)))
+                .unwrap_or_else(|| "-".into()),
+            self.yes_ask.map(|v| format!("{:.2}", v))
+                .or_else(|| extra_str("yes_ask_dollars").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}¢", v * 100.0)))
+                .unwrap_or_else(|| "-".into()),
+            self.last_price.map(|v| format!("{:.2}", v))
+                .or_else(|| extra_str("last_price_dollars").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}¢", v * 100.0)))
+                .unwrap_or_else(|| "-".into()),
+            self.volume.map(|v| v.to_string())
+                .or_else(|| extra_str("volume_fp").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}", v)))
+                .unwrap_or_else(|| "-".into()),
+            self.open_interest.map(|v| v.to_string())
+                .or_else(|| extra_str("open_interest_fp").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}", v)))
+                .unwrap_or_else(|| "-".into()),
         ]
     }
 
@@ -126,6 +140,9 @@ pub struct Trade {
     pub no_price: Option<f64>,
     pub taker_side: Option<String>,
     pub created_time: Option<String>,
+    // catch-all for fields the API sends under different names (e.g. count_fp, yes_price_dollars)
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -148,12 +165,37 @@ impl TableDisplay for Trade {
     }
 
     fn row(&self) -> Vec<String> {
+        let extra_str = |key: &str| -> Option<String> {
+            self.extra.get(key).and_then(|v| {
+                v.as_str().map(|s| s.to_string()).or_else(|| {
+                    // Handle numeric JSON values too
+                    if v.is_number() { Some(v.to_string()) } else { None }
+                })
+            })
+        };
+
+        let count = self.count.map(|v| v.to_string())
+            .or_else(|| extra_str("count_fp").and_then(|s| {
+                s.parse::<f64>().ok().map(|v| {
+                    if v == v.trunc() { format!("{:.0}", v) } else { format!("{}", v) }
+                })
+            }))
+            .unwrap_or_else(|| "-".into());
+
+        let yes_price = self.yes_price.map(|v| format!("{}¢", (v * 100.0).round() as i64))
+            .or_else(|| extra_str("yes_price_dollars").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{}¢", (v * 100.0).round() as i64)))
+            .unwrap_or_else(|| "-".into());
+
+        let no_price = self.no_price.map(|v| format!("{}¢", (v * 100.0).round() as i64))
+            .or_else(|| extra_str("no_price_dollars").and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{}¢", (v * 100.0).round() as i64)))
+            .unwrap_or_else(|| "-".into());
+
         vec![
             format_opt(&self.trade_id),
             format_opt(&self.ticker),
-            format_opt(&self.count),
-            self.yes_price.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.no_price.map_or("-".into(), |v| format!("{:.2}", v)),
+            count,
+            yes_price,
+            no_price,
             format_opt(&self.taker_side),
             format_opt(&self.created_time),
         ]
@@ -165,22 +207,39 @@ impl TableDisplay for Trade {
 pub struct Candlestick {
     pub ticker: Option<String>,
     pub period: Option<String>,
-    pub open: Option<f64>,
-    pub high: Option<f64>,
-    pub low: Option<f64>,
-    pub close: Option<f64>,
     pub volume: Option<i64>,
     pub open_interest: Option<i64>,
     pub start_period_ts: Option<i64>,
     pub end_period_ts: Option<i64>,
-    pub yes_price: Option<f64>,
-    pub yes_bid: Option<f64>,
-    pub yes_ask: Option<f64>,
+    // catch-all: API may return prices as dollar-string objects or different field names
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CandlesticksResponse {
     pub candlesticks: Option<Vec<Candlestick>>,
+}
+
+impl Candlestick {
+    /// Extract a dollar-string from a nested price object (e.g. price.open_dollars)
+    /// or a flat field (e.g. open, open_dollars).
+    fn price_cents(&self, obj_key: &str, field: &str) -> String {
+        // Try nested: extra["price"]["open_dollars"] -> cents
+        if let Some(obj) = self.extra.get(obj_key).and_then(|v| v.as_object()) {
+            if let Some(s) = obj.get(field).and_then(|v| v.as_str()) {
+                if let Ok(v) = s.parse::<f64>() {
+                    return format!("{}¢", (v * 100.0).round() as i64);
+                }
+            }
+        }
+        // Try flat numeric
+        let flat_key = field.replace("_dollars", "");
+        if let Some(v) = self.extra.get(&flat_key).and_then(|v| v.as_f64()) {
+            return format!("{}¢", (v * 100.0).round() as i64);
+        }
+        "-".into()
+    }
 }
 
 impl TableDisplay for Candlestick {
@@ -189,13 +248,21 @@ impl TableDisplay for Candlestick {
     }
 
     fn row(&self) -> Vec<String> {
+        let ts = self.start_period_ts.or(self.end_period_ts);
+        let ts_str = ts
+            .and_then(|t| chrono::DateTime::from_timestamp(t, 0))
+            .map(|dt| dt.format("%Y-%m-%d").to_string())
+            .unwrap_or_else(|| format_opt(&ts));
+
         vec![
-            format_opt(&self.start_period_ts),
-            self.open.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.high.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.low.map_or("-".into(), |v| format!("{:.2}", v)),
-            self.close.map_or("-".into(), |v| format!("{:.2}", v)),
-            format_opt(&self.volume),
+            ts_str,
+            self.price_cents("price", "open_dollars"),
+            self.price_cents("price", "high_dollars"),
+            self.price_cents("price", "low_dollars"),
+            self.price_cents("price", "close_dollars"),
+            self.volume.map(|v| v.to_string())
+                .or_else(|| self.extra.get("volume_fp").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("{:.0}", v)))
+                .unwrap_or_else(|| "-".into()),
         ]
     }
 }
@@ -443,13 +510,14 @@ mod tests {
             no_price: Some(0.45),
             taker_side: Some("yes".to_string()),
             created_time: Some("2026-01-01".to_string()),
+            extra: std::collections::HashMap::new(),
         };
         let row = trade.row();
         assert_eq!(row[0], "trade-123");
         assert_eq!(row[1], "T1");
         assert_eq!(row[2], "10");
-        assert_eq!(row[3], "0.55");
-        assert_eq!(row[4], "0.45");
+        assert_eq!(row[3], "55¢");
+        assert_eq!(row[4], "45¢");
         assert_eq!(row[5], "yes");
         assert_eq!(row[6], "2026-01-01");
     }
@@ -464,6 +532,7 @@ mod tests {
             no_price: None,
             taker_side: None,
             created_time: None,
+            extra: std::collections::HashMap::new(),
         };
         let row = trade.row();
         for cell in &row {
@@ -482,27 +551,28 @@ mod tests {
 
     #[test]
     fn test_candlestick_row() {
+        let mut extra = std::collections::HashMap::new();
+        extra.insert("price".to_string(), serde_json::json!({
+            "open_dollars": "0.5000",
+            "high_dollars": "0.8000",
+            "low_dollars": "0.4000",
+            "close_dollars": "0.7500",
+        }));
         let candle = Candlestick {
             ticker: Some("C1".to_string()),
             period: Some("1h".to_string()),
-            open: Some(0.50),
-            high: Some(0.80),
-            low: Some(0.40),
-            close: Some(0.75),
             volume: Some(200),
             open_interest: None,
             start_period_ts: Some(1700000000),
             end_period_ts: None,
-            yes_price: None,
-            yes_bid: None,
-            yes_ask: None,
+            extra,
         };
         let row = candle.row();
-        assert_eq!(row[0], "1700000000");
-        assert_eq!(row[1], "0.50");
-        assert_eq!(row[2], "0.80");
-        assert_eq!(row[3], "0.40");
-        assert_eq!(row[4], "0.75");
+        assert_eq!(row[0], "2023-11-14");
+        assert_eq!(row[1], "50¢");
+        assert_eq!(row[2], "80¢");
+        assert_eq!(row[3], "40¢");
+        assert_eq!(row[4], "75¢");
         assert_eq!(row[5], "200");
     }
 
@@ -511,17 +581,11 @@ mod tests {
         let candle = Candlestick {
             ticker: None,
             period: None,
-            open: None,
-            high: None,
-            low: None,
-            close: None,
             volume: None,
             open_interest: None,
             start_period_ts: None,
             end_period_ts: None,
-            yes_price: None,
-            yes_bid: None,
-            yes_ask: None,
+            extra: std::collections::HashMap::new(),
         };
         let row = candle.row();
         for cell in &row {

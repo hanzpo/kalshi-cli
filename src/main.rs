@@ -13,6 +13,8 @@ mod output;
 mod pagination;
 mod websocket;
 
+use std::io::IsTerminal;
+
 use anyhow::Result;
 use clap::Parser;
 
@@ -37,15 +39,26 @@ async fn main() -> Result<()> {
     }
 
     let config = Config::load(cli.config.as_deref())?;
-    let config = config.resolve(cli.profile.as_deref())?;
+    // If --demo is passed without --profile, auto-select the "demo" profile if it exists
+    let profile = cli.profile.as_deref().or_else(|| {
+        if cli.demo && config.profiles.contains_key("demo") {
+            Some("demo")
+        } else {
+            None
+        }
+    });
+    let config = config.resolve(profile)?;
     let demo = cli.demo || config.demo.unwrap_or(false);
     let client = KalshiClient::new(&config, demo)?;
-    let color = !cli.no_color && std::env::var("NO_COLOR").is_err();
+    let color = !cli.no_color
+        && std::env::var("NO_COLOR").is_err()
+        && std::io::stdout().is_terminal();
     let out = OutputConfig {
         format: cli.output,
         no_pager: cli.no_pager,
         color,
         quiet: cli.quiet,
+        yes: cli.yes,
     };
 
     match cli.command {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::color;
-use crate::models::common::format_opt;
+use crate::models::common::{flexible_f64, format_opt};
 use crate::output::TableDisplay;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,12 +39,18 @@ impl TableDisplay for Balance {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
     pub ticker: Option<String>,
-    pub market_exposure: Option<i64>,
-    pub position: Option<i64>,
-    pub realized_pnl: Option<i64>,
-    pub resting_orders_count: Option<i64>,
-    pub total_traded: Option<i64>,
-    pub fees_paid: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub market_exposure: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub position: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub realized_pnl: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub resting_orders_count: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub total_traded: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub fees_paid: Option<f64>,
     #[serde(flatten)]
     pub extra: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -70,18 +76,36 @@ impl TableDisplay for Position {
     fn row(&self) -> Vec<String> {
         vec![
             format_opt(&self.ticker),
-            format_opt(&self.position),
-            format_opt(&self.market_exposure),
-            format_opt(&self.realized_pnl),
-            format_opt(&self.fees_paid),
-            format_opt(&self.total_traded),
+            self.position
+                .map(|v| v.to_string())
+                .or_else(|| self.extra.get("position_fp").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .unwrap_or_else(|| "-".to_string()),
+            self.market_exposure
+                .map(|v| format!("${:.2}", v))
+                .or_else(|| self.extra.get("market_exposure_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .unwrap_or_else(|| "-".to_string()),
+            self.realized_pnl
+                .map(|v| format!("${:.2}", v))
+                .or_else(|| self.extra.get("realized_pnl_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .unwrap_or_else(|| "-".to_string()),
+            self.fees_paid
+                .map(|v| format!("${:.2}", v))
+                .or_else(|| self.extra.get("fees_paid_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .unwrap_or_else(|| "-".to_string()),
+            self.total_traded
+                .map(|v| format!("${:.2}", v))
+                .or_else(|| self.extra.get("total_traded_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .unwrap_or_else(|| "-".to_string()),
         ]
     }
 
     fn colored_row(&self, c: bool) -> Vec<String> {
         let mut row = self.row();
-        if let Some(pnl) = self.realized_pnl {
-            row[3] = color::color_pnl(pnl, c);
+        let pnl_dollars = self.realized_pnl
+            .or_else(|| self.extra.get("realized_pnl_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()));
+        if let Some(pnl) = pnl_dollars {
+            let cents = (pnl * 100.0).round() as i64;
+            row[3] = color::color_pnl(cents, c);
         }
         row
     }
@@ -94,11 +118,15 @@ pub struct Fill {
     pub ticker: Option<String>,
     pub side: Option<String>,
     pub action: Option<String>,
-    pub count: Option<i64>,
-    pub yes_price: Option<i64>,
-    pub no_price: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub count: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub yes_price: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub no_price: Option<f64>,
     pub is_taker: Option<bool>,
-    pub fee_cost: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub fee_cost: Option<f64>,
     pub created_time: Option<String>,
     #[serde(flatten)]
     pub extra: std::collections::HashMap<String, serde_json::Value>,
@@ -126,14 +154,29 @@ impl TableDisplay for Fill {
     }
 
     fn row(&self) -> Vec<String> {
+        let count = self.count.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("count_fp")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
+        let yes_price = self.yes_price.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("yes_price_dollars")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
+        let no_price = self.no_price.map(|v| v.to_string()).or_else(|| {
+            self.extra
+                .get("no_price_dollars")
+                .and_then(|v| v.as_str().map(|s| s.to_string()))
+        });
         vec![
             format_opt(&self.fill_id),
             format_opt(&self.ticker),
             format_opt(&self.side),
             format_opt(&self.action),
-            format_opt(&self.count),
-            format_opt(&self.yes_price),
-            format_opt(&self.no_price),
+            format_opt(&count),
+            format_opt(&yes_price),
+            format_opt(&no_price),
             format_opt(&self.fee_cost),
             format_opt(&self.created_time),
         ]
@@ -155,10 +198,14 @@ impl TableDisplay for Fill {
 pub struct Settlement {
     pub ticker: Option<String>,
     pub market_result: Option<String>,
-    pub yes_count: Option<i64>,
-    pub no_count: Option<i64>,
-    pub revenue: Option<i64>,
-    pub fee_cost: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub yes_count: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub no_count: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub revenue: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub fee_cost: Option<f64>,
     pub settled_time: Option<String>,
     #[serde(flatten)]
     pub extra: std::collections::HashMap<String, serde_json::Value>,
@@ -200,8 +247,9 @@ impl TableDisplay for Settlement {
         if let Some(ref result) = self.market_result {
             row[1] = color::color_result(result, c);
         }
-        if let Some(revenue) = self.revenue {
-            row[4] = color::color_pnl(revenue, c);
+        if let Some(dollars) = self.revenue {
+            let cents = (dollars * 100.0).round() as i64;
+            row[4] = color::color_pnl(cents, c);
         }
         row
     }
@@ -275,21 +323,21 @@ mod tests {
     fn test_position_row() {
         let pos = Position {
             ticker: Some("MKT-1".to_string()),
-            market_exposure: Some(500),
-            position: Some(10),
-            realized_pnl: Some(-200),
-            resting_orders_count: Some(3),
-            total_traded: Some(1000),
-            fees_paid: Some(50),
+            market_exposure: Some(500.0),
+            position: Some(10.0),
+            realized_pnl: Some(-200.0),
+            resting_orders_count: Some(3.0),
+            total_traded: Some(1000.0),
+            fees_paid: Some(50.0),
             extra: std::collections::HashMap::new(),
         };
         let row = pos.row();
         assert_eq!(row[0], "MKT-1");
         assert_eq!(row[1], "10");
-        assert_eq!(row[2], "500");
-        assert_eq!(row[3], "-200");
-        assert_eq!(row[4], "50");
-        assert_eq!(row[5], "1000");
+        assert_eq!(row[2], "$500.00");
+        assert_eq!(row[3], "$-200.00");
+        assert_eq!(row[4], "$50.00");
+        assert_eq!(row[5], "$1000.00");
     }
 
     #[test]
@@ -337,11 +385,11 @@ mod tests {
             ticker: Some("MKT-1".to_string()),
             side: Some("yes".to_string()),
             action: Some("buy".to_string()),
-            count: Some(5),
-            yes_price: Some(65),
-            no_price: Some(35),
+            count: Some(5.0),
+            yes_price: Some(65.0),
+            no_price: Some(35.0),
             is_taker: Some(true),
-            fee_cost: Some(10),
+            fee_cost: Some(10.0),
             created_time: Some("2026-01-01".to_string()),
             extra: std::collections::HashMap::new(),
         };
@@ -401,10 +449,10 @@ mod tests {
         let s = Settlement {
             ticker: Some("MKT-1".to_string()),
             market_result: Some("yes".to_string()),
-            yes_count: Some(10),
-            no_count: Some(0),
-            revenue: Some(1000),
-            fee_cost: Some(50),
+            yes_count: Some(10.0),
+            no_count: Some(0.0),
+            revenue: Some(10.0),
+            fee_cost: Some(0.5),
             settled_time: Some("2026-02-01".to_string()),
             extra: std::collections::HashMap::new(),
         };
@@ -413,8 +461,8 @@ mod tests {
         assert_eq!(row[1], "yes");
         assert_eq!(row[2], "10");
         assert_eq!(row[3], "0");
-        assert_eq!(row[4], "1000");
-        assert_eq!(row[5], "50");
+        assert_eq!(row[4], "10");
+        assert_eq!(row[5], "0.5");
         assert_eq!(row[6], "2026-02-01");
     }
 

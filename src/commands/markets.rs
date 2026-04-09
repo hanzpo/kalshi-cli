@@ -6,7 +6,8 @@ use crate::client::KalshiClient;
 use crate::models::market::{
     CandlesticksResponse, MarketResponse, MarketsResponse, OrderbookResponse, TradesResponse,
 };
-use crate::output::{OutputConfig, output, output_one, output_paginated, print_json};
+use crate::color;
+use crate::output::{OutputConfig, output, output_one, output_paginated, paged_print, print_json};
 use crate::pagination::{DEFAULT_DISPLAY_LIMIT, MARKETS_PAGE_SIZE, PaginationOpts, auto_paginate, paginated_list};
 
 /// Maximum number of markets to scan for aggregate commands (hot, expiring, spread).
@@ -41,10 +42,10 @@ fn build_market_query(
         query.push(("status".to_string(), s.clone()));
     }
     if let Some(s) = series_ticker {
-        query.push(("series_ticker".to_string(), s.clone()));
+        query.push(("series_ticker".to_string(), s.to_uppercase()));
     }
     if let Some(e) = event_ticker {
-        query.push(("event_ticker".to_string(), e.clone()));
+        query.push(("event_ticker".to_string(), e.to_uppercase()));
     }
     if !include_combos {
         query.push(("mve_filter".to_string(), "exclude".to_string()));
@@ -75,11 +76,14 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             series_ticker,
             event_ticker,
             include_combos,
+            search,
         } => {
+            let search_lower = search.map(|s| s.to_lowercase());
             paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), format, |page_limit, page_cursor| {
                 let status = status.clone();
                 let series_ticker = series_ticker.clone();
                 let event_ticker = event_ticker.clone();
+                let search_lower = search_lower.clone();
                 async move {
                     let query = build_market_query(
                         page_limit,
@@ -89,15 +93,43 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                         &event_ticker,
                         include_combos,
                     );
-                    fetch_markets_page(client, &query).await
+                    let (markets, cursor) = fetch_markets_page(client, &query).await?;
+                    let filtered = if let Some(ref needle) = search_lower {
+                        markets
+                            .into_iter()
+                            .filter(|m| {
+                                m.title
+                                    .as_ref()
+                                    .is_some_and(|t| t.to_lowercase().contains(needle))
+                                    || m.ticker
+                                        .as_ref()
+                                        .is_some_and(|t| t.to_lowercase().contains(needle))
+                            })
+                            .collect()
+                    } else {
+                        markets
+                    };
+                    Ok((filtered, cursor))
                 }
             })
             .await?;
         }
         MarketCmd::Get { ticker } => {
-            let path = format!("/markets/{}", ticker);
-            let resp: MarketResponse = client.get(&path, &[]).await?;
-            output_one(&resp.market, format)?;
+            let upper = ticker.to_uppercase();
+            let path = format!("/markets/{}", upper);
+            match client.get::<MarketResponse>(&path, &[]).await {
+                Ok(resp) => output_one(&resp.market, format)?,
+                Err(e) => {
+                    let msg = e.to_string();
+                    if msg.contains("404") {
+                        eprintln!("Error: market '{}' not found.", upper);
+                        eprintln!("Hint: try `kalshi market search \"{}\"` to find matching markets.",
+                            upper.split('-').next().unwrap_or(&upper));
+                        return Err(e);
+                    }
+                    return Err(e);
+                }
+            }
         }
         MarketCmd::Trade {
             ticker,
@@ -141,11 +173,13 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             start_ts,
             end_ts,
         } => {
-            let path = format!("/series/{}/markets/{}/candlesticks", series_ticker, ticker);
+            let path = format!("/series/{}/markets/{}/candlesticks", series_ticker.to_uppercase(), ticker.to_uppercase());
             let mut query = Vec::new();
             let period_str = period.map(|p| p.to_string());
-            let start_str = start_ts.map(|t| t.to_string());
-            let end_str = end_ts.map(|t| t.to_string());
+            // Default to last 7 days if not specified (API requires both start_ts and end_ts)
+            let now = chrono::Utc::now().timestamp();
+            let start_str = Some(start_ts.unwrap_or(now - 7 * 24 * 3600).to_string());
+            let end_str = Some(end_ts.unwrap_or(now).to_string());
 
             if let Some(ref p) = period_str {
                 query.push(("period_interval", p.as_str()));
@@ -175,7 +209,36 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             let page_size = pick_search_page_size(limit.unwrap_or(DEFAULT_DISPLAY_LIMIT));
             let page_size_str = page_size.to_string();
 
-            if all {
+            if all && format.is_non_interactive() {
+                // Non-interactive --all: fetch all pages and dump to stdout
+                let ps = pick_search_page_size(100).to_string();
+                let mut all_items = Vec::new();
+                let mut next = cursor;
+                loop {
+                    let mut params: Vec<(&str, &str)> = vec![
+                        ("query", query.as_str()),
+                        ("order_by", "querymatch"),
+                        ("page_size", ps.as_str()),
+                        ("fuzzy_threshold", "4"),
+                    ];
+                    let cursor_val;
+                    if let Some(ref c) = next {
+                        cursor_val = c.clone();
+                        params.push(("cursor", &cursor_val));
+                    }
+                    let resp: SearchResponse =
+                        client.get_absolute(&search_url, &params).await?;
+                    let items = resp.current_page.unwrap_or_default();
+                    let done = items.is_empty()
+                        || resp.next_cursor.as_ref().is_none_or(|c| c.is_empty());
+                    all_items.extend(items);
+                    if done {
+                        break;
+                    }
+                    next = resp.next_cursor;
+                }
+                output_paginated(&all_items, false, format)?;
+            } else if all {
                 // Interactive browser
                 let display_size = limit.unwrap_or(25);
                 let ps = pick_search_page_size(display_size).to_string();
@@ -255,15 +318,17 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
         }
         MarketCmd::Orderbook { ticker, depth } => {
             client.require_auth()?;
-            let path = format!("/markets/{}/orderbook", ticker);
+            let path = format!("/markets/{}/orderbook", ticker.to_uppercase());
             let depth_str = depth.map(|d| d.to_string());
             let mut query = Vec::new();
             if let Some(ref d) = depth_str {
                 query.push(("depth", d.as_str()));
             }
             let resp: OrderbookResponse = client.get(&path, &query).await?;
-            // Orderbook is complex nested data, always print as JSON
-            print_json(&resp.orderbook, format.no_pager)?;
+            match resp.orderbook {
+                Some(ob) => print_json(&ob, format.no_pager)?,
+                None => eprintln!("No orderbook data for {}", ticker),
+            }
         }
         MarketCmd::Hot { limit: top_n, include_combos } => {
             let opts = PaginationOpts {
@@ -282,15 +347,26 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             })
             .await?;
 
-            let mut markets = result.items;
-            markets.sort_by(|a, b| b.volume_24h.unwrap_or(0).cmp(&a.volume_24h.unwrap_or(0)));
+            let get_volume = |m: &crate::models::market::Market| -> f64 {
+                m.volume_24h.map(|v| v as f64)
+                    .or_else(|| m.extra.get("volume_24h_fp").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                    .or_else(|| m.volume.map(|v| v as f64))
+                    .or_else(|| m.extra.get("volume_fp").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                    .unwrap_or(0.0)
+            };
+            let mut markets: Vec<_> = result.items.into_iter()
+                .filter(|m| get_volume(m) > 0.0)
+                .collect();
+            markets.sort_by(|a, b| {
+                get_volume(b).partial_cmp(&get_volume(a)).unwrap_or(std::cmp::Ordering::Equal)
+            });
             markets.truncate(top_n as usize);
             if result.has_more {
                 eprintln!("(scanned {} markets; results are approximate)", SCAN_LIMIT);
             }
             output(&markets, format)?;
         }
-        MarketCmd::Expiring { within, include_combos } => {
+        MarketCmd::Expiring { within, limit: top_n, include_combos } => {
             let opts = PaginationOpts {
                 limit: Some(SCAN_LIMIT),
                 cursor: None,
@@ -322,6 +398,9 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 })
                 .collect();
             expiring.sort_by(|a, b| a.close_time.cmp(&b.close_time));
+            if let Some(n) = top_n {
+                expiring.truncate(n as usize);
+            }
             if result.has_more {
                 eprintln!(
                     "(scanned {} markets; some expiring markets may be missing)",
@@ -347,14 +426,24 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             })
             .await?;
 
+            let get_bid = |m: &crate::models::market::Market| -> Option<f64> {
+                m.yes_bid.or_else(|| m.extra.get("yes_bid_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+            };
+            let get_ask = |m: &crate::models::market::Market| -> Option<f64> {
+                m.yes_ask.or_else(|| m.extra.get("yes_ask_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+            };
             let mut markets: Vec<_> = result
                 .items
                 .into_iter()
-                .filter(|m| m.yes_bid.is_some() && m.yes_ask.is_some())
+                .filter(|m| {
+                    let bid = get_bid(m);
+                    let ask = get_ask(m);
+                    bid.is_some() && ask.is_some() && bid != ask
+                })
                 .collect();
             markets.sort_by(|a, b| {
-                let spread_a = a.yes_ask.unwrap_or(0.0) - a.yes_bid.unwrap_or(0.0);
-                let spread_b = b.yes_ask.unwrap_or(0.0) - b.yes_bid.unwrap_or(0.0);
+                let spread_a = get_ask(a).unwrap_or(0.0) - get_bid(a).unwrap_or(0.0);
+                let spread_b = get_ask(b).unwrap_or(0.0) - get_bid(b).unwrap_or(0.0);
                 spread_b
                     .partial_cmp(&spread_a)
                     .unwrap_or(std::cmp::Ordering::Equal)
@@ -365,9 +454,28 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             }
             output(&markets, format)?;
         }
+        MarketCmd::Dist {
+            event_ticker,
+            cdf,
+            width,
+            ask,
+            bid,
+        } => {
+            // Fetch all markets for this event
+            let event_ticker = event_ticker.to_uppercase();
+            let query = build_market_query(1000, None, &None, &None, &Some(event_ticker.clone()), false);
+            let (markets, _) = fetch_markets_page(client, &query).await?;
+            if markets.is_empty() {
+                eprintln!("No markets found for event {}", event_ticker);
+                return Ok(());
+            }
+
+            let chart = render_dist_colored(&markets, cdf, width, ask, bid, format.color);
+            paged_print(&chart, format.no_pager);
+        }
         MarketCmd::Analyze { ticker, buy, sell } => {
             client.require_auth()?;
-            let path = format!("/markets/{}/orderbook", ticker);
+            let path = format!("/markets/{}/orderbook", ticker.to_uppercase());
             let resp: OrderbookResponse = client.get(&path, &[("depth", "100")]).await?;
             let ob = resp
                 .orderbook
@@ -445,6 +553,183 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
         }
     }
     Ok(())
+}
+
+/// Render an implied probability distribution chart for an event's markets.
+///
+/// Markets with ">=" strike prices form a survival function P(X >= n).
+/// Default (PMF) mode differences consecutive values to get P(X in [n_i, n_{i+1})).
+/// CDF mode (--cdf) shows the raw survival probabilities.
+/// Zero-probability buckets are hidden in PMF mode.
+/// Labels show range intervals (e.g. "50–60") with "+" on the last bucket.
+fn render_dist_colored(
+    markets: &[crate::models::market::Market],
+    cdf: bool,
+    bar_width: usize,
+    use_ask: bool,
+    use_bid: bool,
+    color_enabled: bool,
+) -> String {
+    // Helper: parse a dollar-string from the extra map (e.g. "0.6500" -> 0.65)
+    let extra_f64 = |m: &crate::models::market::Market, key: &str| -> Option<f64> {
+        m.extra.get(key).and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<f64>().ok())
+                .or_else(|| v.as_f64())
+        })
+    };
+
+    let get_prob = |m: &crate::models::market::Market| -> Option<f64> {
+        let get_bid = || m.yes_bid.or_else(|| extra_f64(m, "yes_bid_dollars"));
+        let get_ask = || m.yes_ask.or_else(|| extra_f64(m, "yes_ask_dollars"));
+
+        if use_ask {
+            get_ask()
+        } else if use_bid {
+            get_bid()
+        } else {
+            let bid = get_bid().unwrap_or(0.0);
+            let ask = get_ask().unwrap_or(0.0);
+            if bid == 0.0 && ask == 0.0 {
+                return None;
+            }
+            Some(if bid == 0.0 { ask } else if ask == 0.0 { bid } else { (bid + ask) / 2.0 })
+        }
+    };
+
+    // Try numeric strike extraction first (for range/numeric markets)
+    let mut strikes: Vec<(f64, f64)> = markets
+        .iter()
+        .filter_map(|m| {
+            let prob = get_prob(m)?;
+            let strike = m.floor_strike.or_else(|| {
+                let text = m.yes_sub_title.as_ref().or(m.title.as_ref())?;
+                text.split(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+                    .find_map(|s| s.parse::<f64>().ok())
+            })?;
+            Some((strike, prob))
+        })
+        .collect();
+
+    // If no numeric strikes found, fall back to categorical mode (use labels directly)
+    let is_categorical = strikes.is_empty();
+    let mut categorical: Vec<(String, f64)> = if is_categorical {
+        let mut items: Vec<(String, f64)> = markets
+            .iter()
+            .filter_map(|m| {
+                let prob = get_prob(m)?;
+                let label = m.yes_sub_title.as_ref()
+                    .or(m.subtitle.as_ref())
+                    .or_else(|| m.ticker.as_ref())
+                    .cloned()
+                    .unwrap_or_else(|| "-".to_string());
+                Some((label, prob))
+            })
+            .collect();
+        items.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        items
+    } else {
+        Vec::new()
+    };
+
+    if strikes.is_empty() && categorical.is_empty() {
+        return "No markets with price data.\n".to_string();
+    }
+
+    strikes.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Build display rows: (label, probability)
+    let display: Vec<(String, f64)> = if is_categorical {
+        // Categorical markets: just show label + probability (no CDF/PMF distinction)
+        std::mem::take(&mut categorical)
+    } else if cdf {
+        // CDF mode: show raw survival values with original labels
+        strikes
+            .iter()
+            .map(|(s, p)| (format_strike(*s), *p))
+            .collect()
+    } else {
+        // PMF mode: difference consecutive survival values, use range labels
+        let mut pmf = Vec::new();
+        for i in 0..strikes.len() {
+            let next_prob = strikes.get(i + 1).map(|(_, p)| *p).unwrap_or(0.0);
+            let p = (strikes[i].1 - next_prob).max(0.0);
+            if p < 0.005 {
+                continue; // skip ~0% buckets
+            }
+            let label = if let Some(next) = strikes.get(i + 1) {
+                format!("{}–{}", format_strike(strikes[i].0), format_strike(next.0))
+            } else {
+                format!("{}+", format_strike(strikes[i].0))
+            };
+            pmf.push((label, p));
+        }
+        pmf
+    };
+
+    if display.is_empty() {
+        return "No significant probability buckets.\n".to_string();
+    }
+
+    let max_prob = display.iter().map(|(_, p)| *p).fold(0.0_f64, f64::max);
+    let label_width = display.iter().map(|(l, _)| l.chars().count()).max().unwrap_or(10);
+
+    let mut out = String::new();
+
+    if cdf {
+        let price_label = if use_ask { "ask" } else if use_bid { "bid" } else { "mid" };
+        out.push_str(&format!(
+            "  {}  P(X >= strike), {} price\n\n",
+            color::green("SURVIVAL CDF", color_enabled),
+            price_label,
+        ));
+    } else {
+        out.push_str(&format!(
+            "  {}  P(ends in window)\n\n",
+            color::green("PROBABILITY DENSITY", color_enabled),
+        ));
+    }
+
+    for (label, p) in &display {
+        let bar_len = if max_prob > 0.0 {
+            ((*p / max_prob) * bar_width as f64).round() as usize
+        } else {
+            0
+        };
+
+        // Color based on probability relative to max (highest prob = hottest)
+        let ratio = if max_prob > 0.0 { *p / max_prob } else { 0.0 };
+        let bar: String = "\u{2588}".repeat(bar_len);
+        let pad: String = " ".repeat(bar_width.saturating_sub(bar_len));
+        let pct = format!("{:4.1}%", p * 100.0);
+
+        let colored_bar = color::color_heat(&bar, ratio, color_enabled);
+        let colored_pct = if *p < 0.02 {
+            color::dim(&pct, color_enabled)
+        } else {
+            pct
+        };
+
+        out.push_str(&format!(
+            "  {:>width$}  {}{} {:>6}\n",
+            label,
+            colored_bar,
+            pad,
+            colored_pct,
+            width = label_width,
+        ));
+    }
+    out.push('\n');
+    out
+}
+
+/// Format a strike value: show as integer if whole, otherwise keep one decimal.
+fn format_strike(v: f64) -> String {
+    if (v - v.round()).abs() < 0.01 {
+        format!("{}", v as i64)
+    } else {
+        format!("{:.1}", v)
+    }
 }
 
 pub(crate) fn simulate_fill(levels: &[(f64, i64)], mut qty: i64, buying: bool) -> f64 {
@@ -615,5 +900,125 @@ mod tests {
             query[1],
             ("event_ticker".to_string(), "EVT-ABC".to_string())
         );
+    }
+
+    // ── render_dist tests ──
+
+    fn make_strike_market(strike: f64, yes_bid: f64, yes_ask: f64) -> crate::models::market::Market {
+        crate::models::market::Market {
+            ticker: Some(format!("T-G{}", strike as i64)),
+            yes_sub_title: Some(format!("At least {}", strike as i64)),
+            floor_strike: Some(strike),
+            yes_bid: Some(yes_bid),
+            yes_ask: Some(yes_ask),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn render_dist_pmf_shows_ranges() {
+        // Survival: >=50 @ 90%, >=100 @ 60%, >=200 @ 20%
+        // PMF: 50–100: 30%, 100–200: 40%, 200+: 20%
+        let markets = vec![
+            make_strike_market(50.0, 0.90, 0.90),
+            make_strike_market(100.0, 0.60, 0.60),
+            make_strike_market(200.0, 0.20, 0.20),
+        ];
+        let out = render_dist_colored(&markets, false, 20, false, false, false);
+        assert!(out.contains("PROBABILITY DENSITY"));
+        assert!(out.contains("50\u{2013}100"));   // range label with en-dash
+        assert!(out.contains("100\u{2013}200"));
+        assert!(out.contains("200+"));            // last bucket
+        assert!(out.contains("30.0%"));
+        assert!(out.contains("40.0%"));
+        assert!(out.contains("20.0%"));
+    }
+
+    #[test]
+    fn render_dist_hides_zero_buckets() {
+        // First two strikes both at 100% → difference is 0, should be hidden
+        let markets = vec![
+            make_strike_market(10.0, 1.0, 1.0),
+            make_strike_market(20.0, 1.0, 1.0),
+            make_strike_market(50.0, 0.50, 0.50),
+        ];
+        let out = render_dist_colored(&markets, false, 20, false, false, false);
+        // "10–20" bucket is 0%, should not appear
+        assert!(!out.contains("10\u{2013}20"));
+        // "20–50" bucket is 50%, should appear
+        assert!(out.contains("20\u{2013}50"));
+    }
+
+    #[test]
+    fn render_dist_cdf_shows_raw_survival() {
+        let markets = vec![
+            make_strike_market(50.0, 0.80, 0.80),
+            make_strike_market(100.0, 0.50, 0.50),
+            make_strike_market(200.0, 0.10, 0.10),
+        ];
+        let out = render_dist_colored(&markets, true, 20, false, false, false);
+        assert!(out.contains("SURVIVAL CDF"));
+        assert!(out.contains("80.0%"));
+        assert!(out.contains("50.0%"));
+        assert!(out.contains("10.0%"));
+    }
+
+    #[test]
+    fn render_dist_empty_markets() {
+        let out = render_dist_colored(&[], false, 20, false, false, false);
+        assert!(out.contains("No markets with price data"));
+    }
+
+    #[test]
+    fn render_dist_no_price_data() {
+        let markets = vec![crate::models::market::Market {
+            ticker: Some("T-1".to_string()),
+            floor_strike: Some(100.0),
+            ..Default::default()
+        }];
+        let out = render_dist_colored(&markets, false, 20, false, false, false);
+        assert!(out.contains("No markets with price data"));
+    }
+
+    #[test]
+    fn render_dist_uses_dollar_extras_fallback() {
+        let mut extra = std::collections::HashMap::new();
+        extra.insert(
+            "yes_bid_dollars".to_string(),
+            serde_json::Value::String("0.4500".to_string()),
+        );
+        extra.insert(
+            "yes_ask_dollars".to_string(),
+            serde_json::Value::String("0.5500".to_string()),
+        );
+        let markets = vec![crate::models::market::Market {
+            ticker: Some("T-1".to_string()),
+            yes_sub_title: Some("At least 100".to_string()),
+            floor_strike: Some(100.0),
+            extra,
+            ..Default::default()
+        }];
+        // Single market → last bucket shows as "100+"
+        let out = render_dist_colored(&markets, false, 20, false, false, false);
+        assert!(out.contains("100+"));
+        assert!(out.contains("50.0%"));
+    }
+
+    #[test]
+    fn render_dist_sorts_by_floor_strike() {
+        let markets = vec![
+            make_strike_market(200.0, 0.30, 0.30),
+            make_strike_market(50.0, 0.80, 0.80),
+            make_strike_market(100.0, 0.50, 0.50),
+        ];
+        let out = render_dist_colored(&markets, false, 20, false, false, false);
+        let data_lines: Vec<&str> = out
+            .lines()
+            .filter(|l| l.contains('%') && !l.contains("P("))
+            .collect();
+        assert_eq!(data_lines.len(), 3);
+        assert!(data_lines[0].contains("50\u{2013}100"));
+        assert!(data_lines[1].contains("100\u{2013}200"));
+        assert!(data_lines[2].contains("200+"));
     }
 }

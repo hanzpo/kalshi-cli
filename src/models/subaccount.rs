@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::models::common::format_opt;
+use crate::models::common::{flexible_f64, format_opt};
 use crate::output::TableDisplay;
 
 #[derive(Debug, Serialize)]
@@ -17,9 +17,12 @@ pub struct TransferRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubaccountBalance {
-    pub subaccount_id: Option<i64>,
-    pub balance: Option<i64>,
-    pub portfolio_value: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub subaccount_id: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub balance: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub portfolio_value: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -44,9 +47,12 @@ impl TableDisplay for SubaccountBalance {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubaccountTransfer {
     pub id: Option<String>,
-    pub from: Option<i64>,
-    pub to: Option<i64>,
-    pub amount: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub from: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub to: Option<f64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub amount: Option<f64>,
     pub created_time: Option<String>,
 }
 
@@ -85,7 +91,8 @@ pub struct UpdateNettingRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateSubaccountResponse {
-    pub subaccount_id: Option<i64>,
+    #[serde(default, deserialize_with = "flexible_f64::deserialize")]
+    pub subaccount_id: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -106,9 +113,9 @@ mod tests {
     #[test]
     fn subaccount_balance_row_all_some() {
         let b = SubaccountBalance {
-            subaccount_id: Some(42),
-            balance: Some(1000),
-            portfolio_value: Some(5000),
+            subaccount_id: Some(42.0),
+            balance: Some(1000.0),
+            portfolio_value: Some(5000.0),
         };
         let row = b.row();
         assert_eq!(row, vec!["42", "1000", "5000"]);
@@ -135,9 +142,9 @@ mod tests {
     fn subaccount_transfer_row_all_some() {
         let t = SubaccountTransfer {
             id: Some("xfer-1".to_string()),
-            from: Some(1),
-            to: Some(2),
-            amount: Some(500),
+            from: Some(1.0),
+            to: Some(2.0),
+            amount: Some(500.0),
             created_time: Some("2025-06-01T00:00:00Z".to_string()),
         };
         let row = t.row();

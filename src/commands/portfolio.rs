@@ -149,7 +149,7 @@ pub async fn execute(client: &KalshiClient, cmd: PortfolioCmd, out: &OutputConfi
             let settle_list = settlements.settlements.unwrap_or_default();
 
             let total_position_count = pos_list.len();
-            let total_contracts: i64 = pos_list.iter().map(|p| p.position.unwrap_or(0).abs()).sum();
+            let total_contracts: i64 = pos_list.iter().map(|p| p.position.unwrap_or(0.0).abs() as i64).sum();
 
             let total_settled = settle_list.len();
 
