@@ -11,7 +11,11 @@ pub async fn execute_rfq(client: &KalshiClient, cmd: RfqCmd, out: &OutputConfig)
     client.require_auth()?;
 
     match cmd {
-        RfqCmd::List { limit, cursor, all: _ } => {
+        RfqCmd::List {
+            limit,
+            cursor,
+            all: _,
+        } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {

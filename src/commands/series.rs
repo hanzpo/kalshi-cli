@@ -9,16 +9,23 @@ use crate::pagination::paginated_list;
 pub async fn execute(client: &KalshiClient, cmd: SeriesCmd, out: &OutputConfig) -> Result<()> {
     match cmd {
         SeriesCmd::List { limit, cursor, all } => {
-            paginated_list(all, limit, cursor, None, out, |page_limit, page_cursor| async move {
-                let mut query = vec![("limit", page_limit.to_string())];
-                if let Some(c) = page_cursor {
-                    query.push(("cursor", c));
-                }
-                let query_refs: Vec<(&str, &str)> =
-                    query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                let resp: SeriesListResponse = client.get("/series", &query_refs).await?;
-                Ok((resp.series.unwrap_or_default(), resp.cursor))
-            })
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                None,
+                out,
+                |page_limit, page_cursor| async move {
+                    let mut query = vec![("limit", page_limit.to_string())];
+                    if let Some(c) = page_cursor {
+                        query.push(("cursor", c));
+                    }
+                    let query_refs: Vec<(&str, &str)> =
+                        query.iter().map(|(k, v)| (*k, v.as_str())).collect();
+                    let resp: SeriesListResponse = client.get("/series", &query_refs).await?;
+                    Ok((resp.series.unwrap_or_default(), resp.cursor))
+                },
+            )
             .await?;
         }
         SeriesCmd::Get { series_ticker } => {

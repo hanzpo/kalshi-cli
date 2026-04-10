@@ -36,10 +36,12 @@ impl KalshiClient {
             PROD_BASE_URL.to_string()
         };
 
-        let signer = match (&config.api_key_id, &config.private_key, &config.private_key_path) {
-            (Some(key_id), Some(pem), _) => {
-                Some(KalshiSigner::from_pem(key_id.clone(), pem)?)
-            }
+        let signer = match (
+            &config.api_key_id,
+            &config.private_key,
+            &config.private_key_path,
+        ) {
+            (Some(key_id), Some(pem), _) => Some(KalshiSigner::from_pem(key_id.clone(), pem)?),
             (Some(key_id), None, Some(pem_path)) => {
                 Some(KalshiSigner::new(key_id.clone(), Path::new(pem_path))?)
             }
@@ -251,8 +253,7 @@ impl KalshiClient {
                 let (code, message) = api_err.into_parts();
                 bail!(KalshiError::Api {
                     status: status_code,
-                    message: message
-                        .unwrap_or_else(|| "Unknown error".to_string()),
+                    message: message.unwrap_or_else(|| "Unknown error".to_string()),
                     code,
                 });
             }
@@ -338,10 +339,7 @@ mod tests {
     #[tokio::test]
     async fn parse_response_success_with_empty_body() {
         let client = KalshiClient::new(&empty_config(), false).unwrap();
-        let resp = http::Response::builder()
-            .status(200)
-            .body("")
-            .unwrap();
+        let resp = http::Response::builder().status(200).body("").unwrap();
         let resp = Response::from(resp);
         // Empty body should parse as empty JSON object
         let result: serde_json::Value = client.parse_response(resp).await.unwrap();
@@ -356,7 +354,10 @@ mod tests {
             .body(r#"{"code": "FORBIDDEN", "message": "Not allowed"}"#)
             .unwrap();
         let resp = Response::from(resp);
-        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        let err = client
+            .parse_response::<serde_json::Value>(resp)
+            .await
+            .unwrap_err();
         let msg = err.to_string();
         assert!(msg.contains("403"));
         assert!(msg.contains("Not allowed"));
@@ -370,19 +371,22 @@ mod tests {
             .body("Bad Gateway upstream")
             .unwrap();
         let resp = Response::from(resp);
-        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        let err = client
+            .parse_response::<serde_json::Value>(resp)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("Bad Gateway upstream"));
     }
 
     #[tokio::test]
     async fn parse_response_error_with_empty_body_uses_reason() {
         let client = KalshiClient::new(&empty_config(), false).unwrap();
-        let resp = http::Response::builder()
-            .status(404)
-            .body("")
-            .unwrap();
+        let resp = http::Response::builder().status(404).body("").unwrap();
         let resp = Response::from(resp);
-        let err = client.parse_response::<serde_json::Value>(resp).await.unwrap_err();
+        let err = client
+            .parse_response::<serde_json::Value>(resp)
+            .await
+            .unwrap_err();
         assert!(err.to_string().contains("Not Found"));
     }
 

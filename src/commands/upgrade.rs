@@ -21,7 +21,9 @@ pub async fn execute(check: bool) -> Result<()> {
     let resp = client.get(&url).send().await?;
 
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
-        eprintln!("No releases found. Automatic upgrades will be available once releases are published.");
+        eprintln!(
+            "No releases found. Automatic upgrades will be available once releases are published."
+        );
         return Ok(());
     }
 

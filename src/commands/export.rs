@@ -52,7 +52,10 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
 
             write_export(&result.items, &format, &output, "fills")?;
         }
-        ExportCmd::Position { format, file: output } => {
+        ExportCmd::Position {
+            format,
+            file: output,
+        } => {
             let opts = PaginationOpts {
                 limit: None,
                 cursor: None,
@@ -76,7 +79,10 @@ pub async fn execute(client: &KalshiClient, cmd: ExportCmd, _out: &OutputConfig)
 
             write_export(&result.items, &format, &output, "positions")?;
         }
-        ExportCmd::Settlement { format, file: output } => {
+        ExportCmd::Settlement {
+            format,
+            file: output,
+        } => {
             let opts = PaginationOpts {
                 limit: None,
                 cursor: None,

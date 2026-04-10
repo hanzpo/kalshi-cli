@@ -140,7 +140,10 @@ mod tests {
 
     #[test]
     fn parse_series_no_numeric() {
-        assert_eq!(parse_series("KXCOMPANYACTIONLAYOFF").unwrap(), "KXCOMPANYACTIONLAYOFF");
+        assert_eq!(
+            parse_series("KXCOMPANYACTIONLAYOFF").unwrap(),
+            "KXCOMPANYACTIONLAYOFF"
+        );
     }
 
     #[test]

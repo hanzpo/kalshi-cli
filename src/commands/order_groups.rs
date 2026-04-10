@@ -11,7 +11,11 @@ pub async fn execute(client: &KalshiClient, cmd: OrderGroupCmd, out: &OutputConf
     client.require_auth()?;
 
     match cmd {
-        OrderGroupCmd::List { limit, cursor, all: _ } => {
+        OrderGroupCmd::List {
+            limit,
+            cursor,
+            all: _,
+        } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {

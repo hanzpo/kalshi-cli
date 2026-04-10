@@ -32,10 +32,12 @@ impl KalshiWebSocket {
             PROD_WS_URL.to_string()
         };
 
-        let signer = match (&config.api_key_id, &config.private_key, &config.private_key_path) {
-            (Some(key_id), Some(pem), _) => {
-                Some(KalshiSigner::from_pem(key_id.clone(), pem)?)
-            }
+        let signer = match (
+            &config.api_key_id,
+            &config.private_key,
+            &config.private_key_path,
+        ) {
+            (Some(key_id), Some(pem), _) => Some(KalshiSigner::from_pem(key_id.clone(), pem)?),
             (Some(key_id), None, Some(pem_path)) => {
                 Some(KalshiSigner::new(key_id.clone(), Path::new(pem_path))?)
             }
@@ -149,7 +151,13 @@ mod tests {
         assert_eq!(parsed["params"]["channels"][0], "ticker");
         assert_eq!(parsed["params"]["market_ticker"], "MARKET");
         // Should use singular field, not array
-        assert!(parsed["params"].as_object().unwrap().get("market_tickers").is_none());
+        assert!(
+            parsed["params"]
+                .as_object()
+                .unwrap()
+                .get("market_tickers")
+                .is_none()
+        );
     }
 
     #[test]
@@ -160,7 +168,13 @@ mod tests {
         assert_eq!(parsed["params"]["market_tickers"][1], "B");
         assert_eq!(parsed["params"]["market_tickers"][2], "C");
         // Should use array field, not singular
-        assert!(parsed["params"].as_object().unwrap().get("market_ticker").is_none());
+        assert!(
+            parsed["params"]
+                .as_object()
+                .unwrap()
+                .get("market_ticker")
+                .is_none()
+        );
     }
 
     #[test]
@@ -183,7 +197,13 @@ mod tests {
     fn test_subscribe_msg_without_snapshot() {
         let msg = KalshiWebSocket::subscribe_msg(5, &["orderbook_delta"], &["MKT"], false);
         let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
-        assert!(parsed["params"].as_object().unwrap().get("send_initial_snapshot").is_none());
+        assert!(
+            parsed["params"]
+                .as_object()
+                .unwrap()
+                .get("send_initial_snapshot")
+                .is_none()
+        );
     }
 
     #[test]
@@ -205,8 +225,7 @@ mod tests {
 
     #[test]
     fn test_update_subscription_msg() {
-        let msg =
-            KalshiWebSocket::update_subscription_msg(8, &[5], &["NEW-MKT"], "add_markets");
+        let msg = KalshiWebSocket::update_subscription_msg(8, &[5], &["NEW-MKT"], "add_markets");
         let parsed: serde_json::Value = serde_json::from_str(&msg).unwrap();
         assert_eq!(parsed["id"], 8);
         assert_eq!(parsed["cmd"], "update_subscription");

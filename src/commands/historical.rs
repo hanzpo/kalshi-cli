@@ -19,29 +19,36 @@ pub async fn execute(client: &KalshiClient, cmd: HistoricalCmd, out: &OutputConf
             min_close_ts,
             max_close_ts,
         } => {
-            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), out, |page_limit, page_cursor| {
-                let ticker = ticker.clone();
-                async move {
-                    let mut query = vec![("limit", page_limit.to_string())];
-                    if let Some(c) = page_cursor {
-                        query.push(("cursor", c));
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                Some(MARKETS_PAGE_SIZE),
+                out,
+                |page_limit, page_cursor| {
+                    let ticker = ticker.clone();
+                    async move {
+                        let mut query = vec![("limit", page_limit.to_string())];
+                        if let Some(c) = page_cursor {
+                            query.push(("cursor", c));
+                        }
+                        if let Some(ref t) = ticker {
+                            query.push(("ticker", t.clone()));
+                        }
+                        if let Some(ts) = min_close_ts {
+                            query.push(("min_close_ts", ts.to_string()));
+                        }
+                        if let Some(ts) = max_close_ts {
+                            query.push(("max_close_ts", ts.to_string()));
+                        }
+                        let query_refs: Vec<(&str, &str)> =
+                            query.iter().map(|(k, v)| (*k, v.as_str())).collect();
+                        let resp: HistoricalMarketsResponse =
+                            client.get("/historical/markets", &query_refs).await?;
+                        Ok((resp.markets.unwrap_or_default(), resp.cursor))
                     }
-                    if let Some(ref t) = ticker {
-                        query.push(("ticker", t.clone()));
-                    }
-                    if let Some(ts) = min_close_ts {
-                        query.push(("min_close_ts", ts.to_string()));
-                    }
-                    if let Some(ts) = max_close_ts {
-                        query.push(("max_close_ts", ts.to_string()));
-                    }
-                    let query_refs: Vec<(&str, &str)> =
-                        query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: HistoricalMarketsResponse =
-                        client.get("/historical/markets", &query_refs).await?;
-                    Ok((resp.markets.unwrap_or_default(), resp.cursor))
-                }
-            })
+                },
+            )
             .await?;
         }
         HistoricalCmd::Trade {
@@ -52,29 +59,36 @@ pub async fn execute(client: &KalshiClient, cmd: HistoricalCmd, out: &OutputConf
             min_ts,
             max_ts,
         } => {
-            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), out, |page_limit, page_cursor| {
-                let ticker = ticker.clone();
-                async move {
-                    let mut query = vec![("limit", page_limit.to_string())];
-                    if let Some(c) = page_cursor {
-                        query.push(("cursor", c));
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                Some(MARKETS_PAGE_SIZE),
+                out,
+                |page_limit, page_cursor| {
+                    let ticker = ticker.clone();
+                    async move {
+                        let mut query = vec![("limit", page_limit.to_string())];
+                        if let Some(c) = page_cursor {
+                            query.push(("cursor", c));
+                        }
+                        if let Some(ref t) = ticker {
+                            query.push(("ticker", t.clone()));
+                        }
+                        if let Some(ts) = min_ts {
+                            query.push(("min_ts", ts.to_string()));
+                        }
+                        if let Some(ts) = max_ts {
+                            query.push(("max_ts", ts.to_string()));
+                        }
+                        let query_refs: Vec<(&str, &str)> =
+                            query.iter().map(|(k, v)| (*k, v.as_str())).collect();
+                        let resp: TradesResponse =
+                            client.get("/historical/trades", &query_refs).await?;
+                        Ok((resp.trades.unwrap_or_default(), resp.cursor))
                     }
-                    if let Some(ref t) = ticker {
-                        query.push(("ticker", t.clone()));
-                    }
-                    if let Some(ts) = min_ts {
-                        query.push(("min_ts", ts.to_string()));
-                    }
-                    if let Some(ts) = max_ts {
-                        query.push(("max_ts", ts.to_string()));
-                    }
-                    let query_refs: Vec<(&str, &str)> =
-                        query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: TradesResponse =
-                        client.get("/historical/trades", &query_refs).await?;
-                    Ok((resp.trades.unwrap_or_default(), resp.cursor))
-                }
-            })
+                },
+            )
             .await?;
         }
         HistoricalCmd::Candlestick {

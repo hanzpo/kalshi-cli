@@ -80,31 +80,64 @@ impl TableDisplay for Position {
             format_opt(&self.ticker),
             self.position
                 .map(|v| v.to_string())
-                .or_else(|| self.extra.get("position_fp").and_then(|v| v.as_str()).map(|s| s.to_string()))
+                .or_else(|| {
+                    self.extra
+                        .get("position_fp")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
                 .unwrap_or_else(|| "-".to_string()),
             self.market_exposure
                 .map(|v| format!("${:.2}", v))
-                .or_else(|| self.extra.get("market_exposure_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .or_else(|| {
+                    self.extra
+                        .get("market_exposure_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .map(|v| format!("${:.2}", v))
+                })
                 .unwrap_or_else(|| "-".to_string()),
             self.realized_pnl
                 .map(|v| format!("${:.2}", v))
-                .or_else(|| self.extra.get("realized_pnl_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .or_else(|| {
+                    self.extra
+                        .get("realized_pnl_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .map(|v| format!("${:.2}", v))
+                })
                 .unwrap_or_else(|| "-".to_string()),
             self.fees_paid
                 .map(|v| format!("${:.2}", v))
-                .or_else(|| self.extra.get("fees_paid_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .or_else(|| {
+                    self.extra
+                        .get("fees_paid_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .map(|v| format!("${:.2}", v))
+                })
                 .unwrap_or_else(|| "-".to_string()),
             self.total_traded
                 .map(|v| format!("${:.2}", v))
-                .or_else(|| self.extra.get("total_traded_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()).map(|v| format!("${:.2}", v)))
+                .or_else(|| {
+                    self.extra
+                        .get("total_traded_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse::<f64>().ok())
+                        .map(|v| format!("${:.2}", v))
+                })
                 .unwrap_or_else(|| "-".to_string()),
         ]
     }
 
     fn colored_row(&self, c: bool) -> Vec<String> {
         let mut row = self.row();
-        let pnl_dollars = self.realized_pnl
-            .or_else(|| self.extra.get("realized_pnl_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse::<f64>().ok()));
+        let pnl_dollars = self.realized_pnl.or_else(|| {
+            self.extra
+                .get("realized_pnl_dollars")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<f64>().ok())
+        });
         if let Some(pnl) = pnl_dollars {
             let cents = (pnl * 100.0).round() as i64;
             row[3] = color::color_pnl(cents, c);

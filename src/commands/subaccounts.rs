@@ -35,7 +35,11 @@ pub async fn execute(client: &KalshiClient, cmd: SubaccountCmd, out: &OutputConf
                 client.get("/portfolio/subaccounts/balances", &[]).await?;
             output(&resp.subaccount_balances.unwrap_or_default(), out)?;
         }
-        SubaccountCmd::TransferList { limit, cursor, all: _ } => {
+        SubaccountCmd::TransferList {
+            limit,
+            cursor,
+            all: _,
+        } => {
             let mut query = Vec::new();
             let limit_str = limit.map(|l| l.to_string());
             if let Some(ref l) = limit_str {

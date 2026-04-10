@@ -18,10 +18,7 @@ pub async fn execute(demo: bool) -> Result<()> {
 
     let client = reqwest::Client::new();
     let start = Instant::now();
-    let resp = client
-        .get(format!("{base}/exchange/status"))
-        .send()
-        .await?;
+    let resp = client.get(format!("{base}/exchange/status")).send().await?;
     let latency = start.elapsed();
 
     if !resp.status().is_success() {

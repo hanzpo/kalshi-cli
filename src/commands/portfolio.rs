@@ -31,35 +31,42 @@ pub async fn execute(client: &KalshiClient, cmd: PortfolioCmd, out: &OutputConfi
             count_filter,
             settlement_status,
         } => {
-            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), out, |page_limit, page_cursor| {
-                let ticker = ticker.clone();
-                let event_ticker = event_ticker.clone();
-                let count_filter = count_filter.clone();
-                let settlement_status = settlement_status.clone();
-                async move {
-                    let mut query = vec![("limit", page_limit.to_string())];
-                    if let Some(c) = page_cursor {
-                        query.push(("cursor", c));
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                Some(MARKETS_PAGE_SIZE),
+                out,
+                |page_limit, page_cursor| {
+                    let ticker = ticker.clone();
+                    let event_ticker = event_ticker.clone();
+                    let count_filter = count_filter.clone();
+                    let settlement_status = settlement_status.clone();
+                    async move {
+                        let mut query = vec![("limit", page_limit.to_string())];
+                        if let Some(c) = page_cursor {
+                            query.push(("cursor", c));
+                        }
+                        if let Some(ref t) = ticker {
+                            query.push(("ticker", t.clone()));
+                        }
+                        if let Some(ref e) = event_ticker {
+                            query.push(("event_ticker", e.clone()));
+                        }
+                        if let Some(ref cf) = count_filter {
+                            query.push(("count_filter", cf.clone()));
+                        }
+                        if let Some(ref ss) = settlement_status {
+                            query.push(("settlement_status", ss.clone()));
+                        }
+                        let query_refs: Vec<(&str, &str)> =
+                            query.iter().map(|(k, v)| (*k, v.as_str())).collect();
+                        let resp: PositionsResponse =
+                            client.get("/portfolio/positions", &query_refs).await?;
+                        Ok((resp.market_positions.unwrap_or_default(), resp.cursor))
                     }
-                    if let Some(ref t) = ticker {
-                        query.push(("ticker", t.clone()));
-                    }
-                    if let Some(ref e) = event_ticker {
-                        query.push(("event_ticker", e.clone()));
-                    }
-                    if let Some(ref cf) = count_filter {
-                        query.push(("count_filter", cf.clone()));
-                    }
-                    if let Some(ref ss) = settlement_status {
-                        query.push(("settlement_status", ss.clone()));
-                    }
-                    let query_refs: Vec<(&str, &str)> =
-                        query.iter().map(|(k, v)| (*k, v.as_str())).collect();
-                    let resp: PositionsResponse =
-                        client.get("/portfolio/positions", &query_refs).await?;
-                    Ok((resp.market_positions.unwrap_or_default(), resp.cursor))
-                }
-            })
+                },
+            )
             .await?;
         }
         PortfolioCmd::Fill {
@@ -149,7 +156,10 @@ pub async fn execute(client: &KalshiClient, cmd: PortfolioCmd, out: &OutputConfi
             let settle_list = settlements.settlements.unwrap_or_default();
 
             let total_position_count = pos_list.len();
-            let total_contracts: i64 = pos_list.iter().map(|p| p.position.unwrap_or(0.0).abs() as i64).sum();
+            let total_contracts: i64 = pos_list
+                .iter()
+                .map(|p| p.position.unwrap_or(0.0).abs() as i64)
+                .sum();
 
             let total_settled = settle_list.len();
 

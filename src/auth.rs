@@ -125,8 +125,9 @@ mod tests {
         let key = generate_test_key();
         let signer = KalshiSigner::from_pem("k".to_string(), &pkcs8_pem(&key)).unwrap();
 
-        let (_, timestamp, sig_b64) =
-            signer.sign_request("POST", "/trade-api/v2/portfolio/orders").unwrap();
+        let (_, timestamp, sig_b64) = signer
+            .sign_request("POST", "/trade-api/v2/portfolio/orders")
+            .unwrap();
 
         // Reconstruct the message that was signed
         let message = format!("{}POST/trade-api/v2/portfolio/orders", timestamp);
@@ -166,6 +167,12 @@ mod tests {
     fn from_file_nonexistent_path_errors() {
         let result = KalshiSigner::new("k".to_string(), std::path::Path::new("/no/such/key.pem"));
         assert!(result.is_err());
-        assert!(result.err().unwrap().to_string().contains("read private key"));
+        assert!(
+            result
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("read private key")
+        );
     }
 }

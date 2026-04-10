@@ -43,10 +43,7 @@ pub async fn execute(client: &KalshiClient, url: &str) -> Result<()> {
     }
 
     if markets.len() == 1 {
-        println!(
-            "{}",
-            markets[0].ticker.as_deref().unwrap_or(&event_ticker)
-        );
+        println!("{}", markets[0].ticker.as_deref().unwrap_or(&event_ticker));
     } else {
         for market in &markets {
             if let Some(ticker) = &market.ticker {
