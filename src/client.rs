@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
-use rand::Rng;
+use rand::RngExt;
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::Serialize;
 use serde::de::DeserializeOwned;

@@ -9,8 +9,8 @@ use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::pss::BlindedSigningKey;
 use rsa::rand_core::OsRng;
+use rsa::sha2::Sha256;
 use rsa::signature::{RandomizedSigner, SignatureEncoding};
-use sha2::Sha256;
 
 pub struct KalshiSigner {
     signing_key: BlindedSigningKey<Sha256>,

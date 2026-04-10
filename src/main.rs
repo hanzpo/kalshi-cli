@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
             None
         }
     });
-    let config = config.resolve(profile)?;
+    let config = config.resolve(profile)?.apply_env_overrides();
     let demo = cli.demo || config.demo.unwrap_or(false);
     let client = KalshiClient::new(&config, demo)?;
     let color =

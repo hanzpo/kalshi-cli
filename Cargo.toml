@@ -2,6 +2,11 @@
 name = "kalshi-cli"
 version = "0.1.0"
 edition = "2024"
+description = "CLI for the Kalshi prediction market API"
+homepage = "https://github.com/hanzpo/kalshi-cli"
+repository = "https://github.com/hanzpo/kalshi-cli"
+documentation = "https://github.com/hanzpo/kalshi-cli#readme"
+license = "MIT"
 
 [[bin]]
 name = "kalshi"
@@ -15,8 +20,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "1.1"
 dirs = "6"
-rsa = "0.9"
-sha2 = "0.10"
+rsa = { version = "0.9", features = ["sha2"] }
+sha2 = "0.11"
 base64 = "0.22"
 anyhow = "1"
 thiserror = "2"
@@ -30,8 +35,8 @@ clap_complete = "4"
 tokio-tungstenite = { version = "0.29", features = ["native-tls"] }
 futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
-rand = "0.9"
-rustyline = "15"
+rand = "0.10"
+rustyline = "18"
 shell-words = "1"
 
 [dev-dependencies]

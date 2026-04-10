@@ -121,7 +121,7 @@ fn prompt(msg: &str) -> Result<String> {
 /// Returns (private_key_path, private_key).
 fn prompt_private_key() -> Result<(Option<String>, Option<String>)> {
     println!("\nPrivate key options:");
-    println!("  1) Path to PEM file");
+    println!("  1) Path to PEM file (recommended)");
     println!("  2) Paste key directly");
     let choice = prompt("Choose [1/2] (leave empty to skip): ")?;
 
@@ -141,6 +141,9 @@ fn prompt_private_key() -> Result<(Option<String>, Option<String>)> {
             Ok((Some(expanded), None))
         }
         "2" => {
+            println!(
+                "A path to a PEM file is recommended; pasting stores the key inline in config.toml."
+            );
             println!("Paste your private key (PEM format):");
             let mut key = String::new();
             loop {

@@ -34,21 +34,8 @@ impl Config {
         }
 
         let contents = std::fs::read_to_string(&path).context("Failed to read config file")?;
-        let mut config: Config =
-            toml::from_str(&contents).context("Failed to parse config file")?;
-
-        // Environment variable overrides
-        if let Ok(val) = std::env::var("KALSHI_API_KEY_ID") {
-            config.api_key_id = Some(val);
-        }
-        if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY_PATH") {
-            config.private_key_path = Some(val);
-        }
-        if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY") {
-            config.private_key = Some(val);
-        }
-
-        Ok(config)
+        let config: Config = toml::from_str(&contents).context("Failed to parse config file")?;
+        Ok(config.apply_env_overrides())
     }
 
     /// Overlay a named profile onto the base config.
@@ -78,6 +65,22 @@ impl Config {
             }
         }
         Ok(self)
+    }
+
+    /// Apply environment variable overrides on top of the current effective config.
+    pub fn apply_env_overrides(mut self) -> Self {
+        if let Ok(val) = std::env::var("KALSHI_API_KEY_ID") {
+            self.api_key_id = Some(val);
+        }
+        if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY_PATH") {
+            self.private_key_path = Some(val);
+            self.private_key = None;
+        }
+        if let Ok(val) = std::env::var("KALSHI_PRIVATE_KEY") {
+            self.private_key = Some(val);
+            self.private_key_path = None;
+        }
+        self
     }
 
     pub fn save(&self, override_path: Option<&Path>) -> Result<()> {
@@ -186,6 +189,47 @@ mod tests {
         assert_eq!(resolved.api_key_id, Some("override_key".to_string()));
         assert_eq!(resolved.private_key_path, Some("/base/path".to_string()));
         assert_eq!(resolved.demo, Some(false));
+    }
+
+    #[test]
+    fn test_env_overrides_profile_after_resolve() {
+        let mut profiles = HashMap::new();
+        profiles.insert(
+            "trading".to_string(),
+            Profile {
+                api_key_id: Some("profile_key".to_string()),
+                private_key_path: Some("/profile/key.pem".to_string()),
+                private_key: None,
+                demo: Some(false),
+            },
+        );
+        let config = Config {
+            api_key_id: Some("base_key".to_string()),
+            private_key_path: Some("/base/key.pem".to_string()),
+            private_key: None,
+            demo: Some(false),
+            profiles,
+            ..Config::default()
+        };
+
+        unsafe {
+            std::env::set_var("KALSHI_API_KEY_ID", "env_key");
+            std::env::set_var("KALSHI_PRIVATE_KEY_PATH", "/env/key.pem");
+            std::env::remove_var("KALSHI_PRIVATE_KEY");
+        }
+
+        let resolved = config
+            .resolve(Some("trading"))
+            .unwrap()
+            .apply_env_overrides();
+        assert_eq!(resolved.api_key_id, Some("env_key".to_string()));
+        assert_eq!(resolved.private_key_path, Some("/env/key.pem".to_string()));
+        assert!(resolved.private_key.is_none());
+
+        unsafe {
+            std::env::remove_var("KALSHI_API_KEY_ID");
+            std::env::remove_var("KALSHI_PRIVATE_KEY_PATH");
+        }
     }
 
     #[test]
