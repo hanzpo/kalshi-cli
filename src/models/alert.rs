@@ -8,7 +8,7 @@ impl TableDisplay for Alert {
 
     fn row(&self) -> Vec<String> {
         vec![
-            self.id[..8].to_string(),
+            self.id.chars().take(8).collect::<String>(),
             self.ticker.clone(),
             self.above
                 .map(|v| format!("{}c", v))

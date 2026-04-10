@@ -551,8 +551,98 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 );
             }
         }
+        MarketCmd::History {
+            ticker,
+            interval,
+            period,
+        } => {
+            // Parse interval to minutes
+            let period_minutes = parse_interval(&interval)?;
+            // Parse lookback period to seconds
+            let lookback_secs = parse_period(&period)?;
+
+            // Fetch market to get series_ticker
+            let ticker_upper = ticker.to_uppercase();
+            let market_resp: MarketResponse =
+                client.get(&format!("/markets/{ticker_upper}"), &[]).await?;
+            let series_ticker = market_resp
+                .market
+                .extra
+                .get("series_ticker")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Could not resolve series ticker for {ticker_upper}. Use `market candlestick` with --series-ticker instead."
+                    )
+                })?;
+
+            let now = chrono::Utc::now().timestamp();
+            let start = now - lookback_secs;
+            let period_str = period_minutes.to_string();
+            let start_str = start.to_string();
+            let end_str = now.to_string();
+
+            let path = format!(
+                "/series/{}/markets/{}/candlesticks",
+                series_ticker.to_uppercase(),
+                ticker_upper
+            );
+            let query = vec![
+                ("period_interval", period_str.as_str()),
+                ("start_ts", start_str.as_str()),
+                ("end_ts", end_str.as_str()),
+            ];
+            let resp: CandlesticksResponse = client.get(&path, &query).await?;
+            output_paginated(&resp.candlesticks.unwrap_or_default(), false, format)?;
+        }
+        MarketCmd::Prices { tickers } => {
+            let mut markets = Vec::new();
+            for ticker in &tickers {
+                let ticker_upper = ticker.to_uppercase();
+                match client
+                    .get::<MarketResponse>(&format!("/markets/{ticker_upper}"), &[])
+                    .await
+                {
+                    Ok(resp) => {
+                        markets.push(resp.market);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to fetch {ticker_upper}: {e}");
+                    }
+                }
+            }
+            output_paginated(&markets, false, format)?;
+        }
     }
     Ok(())
+}
+
+fn parse_interval(s: &str) -> anyhow::Result<i64> {
+    match s {
+        "1m" => Ok(1),
+        "5m" => Ok(5),
+        "1h" => Ok(60),
+        "6h" => Ok(360),
+        "1d" => Ok(1440),
+        "1w" => Ok(10080),
+        _ => anyhow::bail!(
+            "Invalid interval '{s}'. Valid values: 1m, 5m, 1h, 6h, 1d, 1w"
+        ),
+    }
+}
+
+fn parse_period(s: &str) -> anyhow::Result<i64> {
+    match s {
+        "1d" => Ok(86_400),
+        "1w" => Ok(7 * 86_400),
+        "1m" => Ok(30 * 86_400),
+        "3m" => Ok(90 * 86_400),
+        "1y" => Ok(365 * 86_400),
+        _ => anyhow::bail!(
+            "Invalid period '{s}'. Valid values: 1d, 1w, 1m, 3m, 1y"
+        ),
+    }
 }
 
 /// Render an implied probability distribution chart for an event's markets.

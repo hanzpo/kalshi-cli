@@ -169,8 +169,8 @@ impl TableDisplay for Order {
             self.order_id
                 .as_ref()
                 .map(|id| {
-                    if id.len() > 12 {
-                        format!("{}...", &id[..12])
+                    if id.chars().count() > 12 {
+                        format!("{}...", id.chars().take(12).collect::<String>())
                     } else {
                         id.clone()
                     }

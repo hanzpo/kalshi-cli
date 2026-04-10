@@ -37,6 +37,13 @@ async fn main() -> Result<()> {
         commands::completions::execute(shell);
         return Ok(());
     }
+    if let Command::Ping = cli.command {
+        let demo = cli.demo;
+        return commands::ping::execute(demo).await;
+    }
+    if let Command::Upgrade { check } = cli.command {
+        return commands::upgrade::execute(check).await;
+    }
 
     let config = Config::load(cli.config.as_deref())?;
     // If --demo is passed without --profile, auto-select the "demo" profile if it exists
@@ -61,70 +68,80 @@ async fn main() -> Result<()> {
         yes: cli.yes,
     };
 
-    match cli.command {
+    dispatch(cli.command, &client, &config, demo, &out).await
+}
+
+pub async fn dispatch(
+    command: Command,
+    client: &KalshiClient,
+    config: &Config,
+    demo: bool,
+    out: &OutputConfig,
+) -> Result<()> {
+    match command {
         Command::Config { .. } | Command::Completions { .. } => unreachable!(),
         Command::Exchange { cmd } => {
-            commands::exchange::execute(&client, cmd, &out).await?;
+            commands::exchange::execute(client, cmd, out).await?;
         }
         Command::Market { cmd } => {
-            commands::markets::execute(&client, cmd, &out).await?;
+            commands::markets::execute(client, cmd, out).await?;
         }
         Command::Event { cmd } => {
-            commands::events::execute(&client, cmd, &out).await?;
+            commands::events::execute(client, cmd, out).await?;
         }
         Command::Series { cmd } => {
-            commands::series::execute(&client, cmd, &out).await?;
+            commands::series::execute(client, cmd, out).await?;
         }
         Command::Order { cmd } => {
-            commands::orders::execute(&client, cmd, &out).await?;
+            commands::orders::execute(client, cmd, out).await?;
         }
         Command::OrderGroup { cmd } => {
-            commands::order_groups::execute(&client, cmd, &out).await?;
+            commands::order_groups::execute(client, cmd, out).await?;
         }
         Command::Portfolio { cmd } => {
-            commands::portfolio::execute(&client, cmd, &out).await?;
+            commands::portfolio::execute(client, cmd, out).await?;
         }
         Command::Historical { cmd } => {
-            commands::historical::execute(&client, cmd, &out).await?;
+            commands::historical::execute(client, cmd, out).await?;
         }
         Command::Subaccount { cmd } => {
-            commands::subaccounts::execute(&client, cmd, &out).await?;
+            commands::subaccounts::execute(client, cmd, out).await?;
         }
         Command::ApiKey { cmd } => {
-            commands::api_keys::execute(&client, cmd, &out).await?;
+            commands::api_keys::execute(client, cmd, out).await?;
         }
         Command::Rfq { cmd } => {
-            commands::communications::execute_rfq(&client, cmd, &out).await?;
+            commands::communications::execute_rfq(client, cmd, out).await?;
         }
         Command::Quote { cmd } => {
-            commands::communications::execute_quote(&client, cmd, &out).await?;
+            commands::communications::execute_quote(client, cmd, out).await?;
         }
         Command::Account { cmd } => {
-            commands::account::execute(&client, cmd, &out).await?;
+            commands::account::execute(client, cmd, out).await?;
         }
         Command::Search { cmd } => {
-            commands::search::execute(&client, cmd, &out).await?;
+            commands::search::execute(client, cmd, out).await?;
         }
         Command::Milestone { cmd } => {
-            commands::milestone::execute(&client, cmd, &out).await?;
+            commands::milestone::execute(client, cmd, out).await?;
         }
         Command::LiveData { cmd } => {
-            commands::live_data::execute(&client, cmd, &out).await?;
+            commands::live_data::execute(client, cmd, out).await?;
         }
         Command::StructuredTarget { cmd } => {
-            commands::structured_target::execute(&client, cmd, &out).await?;
+            commands::structured_target::execute(client, cmd, out).await?;
         }
         Command::IncentiveProgram { cmd } => {
-            commands::incentive_program::execute(&client, cmd, &out).await?;
+            commands::incentive_program::execute(client, cmd, out).await?;
         }
         Command::Fcm { cmd } => {
-            commands::fcm::execute(&client, cmd, &out).await?;
+            commands::fcm::execute(client, cmd, out).await?;
         }
         Command::Collection { cmd } => {
-            commands::collection::execute(&client, cmd, &out).await?;
+            commands::collection::execute(client, cmd, out).await?;
         }
         Command::Status => {
-            commands::status::execute(&client, &out).await?;
+            commands::status::execute(client, out).await?;
         }
         Command::Buy {
             ticker,
@@ -133,7 +150,7 @@ async fn main() -> Result<()> {
             no,
             at,
         } => {
-            commands::trade::execute_buy(&client, &ticker, quantity, yes, no, at, &out).await?;
+            commands::trade::execute_buy(client, &ticker, quantity, yes, no, at, out).await?;
         }
         Command::Sell {
             ticker,
@@ -142,30 +159,39 @@ async fn main() -> Result<()> {
             no,
             at,
         } => {
-            commands::trade::execute_sell(&client, &ticker, quantity, yes, no, at, &out).await?;
+            commands::trade::execute_sell(client, &ticker, quantity, yes, no, at, out).await?;
         }
         Command::Close { ticker } => {
-            commands::trade::execute_close(&client, &ticker, &out).await?;
+            commands::trade::execute_close(client, &ticker, out).await?;
         }
         Command::CancelAll { ticker } => {
-            commands::trade::execute_cancel_all(&client, ticker.as_deref(), &out).await?;
+            commands::trade::execute_cancel_all(client, ticker.as_deref(), out).await?;
         }
         Command::Export { cmd } => {
-            commands::export::execute(&client, cmd, &out).await?;
+            commands::export::execute(client, cmd, out).await?;
         }
         Command::Watch { cmd } => {
-            let ws = websocket::KalshiWebSocket::new(&config, demo)?;
-            commands::watch::execute(&ws, cmd, &out).await?;
+            let ws = websocket::KalshiWebSocket::new(config, demo)?;
+            commands::watch::execute(&ws, cmd, out).await?;
         }
         Command::Alert { cmd } => {
-            let ws = websocket::KalshiWebSocket::new(&config, demo)?;
-            commands::alert::execute(cmd, &ws, &out).await?;
+            let ws = websocket::KalshiWebSocket::new(config, demo)?;
+            commands::alert::execute(cmd, &ws, out).await?;
         }
         Command::Ticker { url } => {
-            commands::ticker::execute(&client, &url).await?;
+            commands::ticker::execute(client, &url).await?;
         }
         Command::Url { ticker, open } => {
-            commands::url::execute(&client, &ticker, open).await?;
+            commands::url::execute(client, &ticker, open).await?;
+        }
+        Command::Ping => {
+            commands::ping::execute(demo).await?;
+        }
+        Command::Shell => {
+            commands::shell::execute(client, config, demo, out).await?;
+        }
+        Command::Upgrade { check } => {
+            commands::upgrade::execute(check).await?;
         }
     }
 

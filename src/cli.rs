@@ -233,6 +233,17 @@ pub enum Command {
         cmd: ApiKeyCmd,
     },
 
+    /// Check API connectivity and latency (no auth required)
+    Ping,
+    /// Interactive shell (REPL) for running commands without re-typing `kalshi`
+    Shell,
+    /// Check for updates and upgrade to the latest version
+    Upgrade {
+        /// Check only, don't install
+        #[arg(long)]
+        check: bool,
+    },
+
     // ── Hidden (advanced/niche) ──
     /// Generate shell completions
     #[command(hide = true)]
@@ -315,17 +326,22 @@ pub enum ExchangeCmd {
 pub enum MarketCmd {
     /// List markets
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
         /// Browse all markets interactively, one page at a time
         #[arg(long)]
         all: bool,
+        /// Filter by status (e.g. open, closed, settled)
         #[arg(long)]
         status: Option<String>,
+        /// Filter by series ticker
         #[arg(long)]
         series_ticker: Option<String>,
+        /// Filter by event ticker
         #[arg(long, alias = "event")]
         event_ticker: Option<String>,
         /// Include combo/multivariate markets (excluded by default)
@@ -345,14 +361,19 @@ pub enum MarketCmd {
     Trade {
         /// Market ticker (optional — omit to list all trades)
         ticker: Option<String>,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Only trades after this unix timestamp
         #[arg(long)]
         min_ts: Option<i64>,
+        /// Only trades before this unix timestamp
         #[arg(long)]
         max_ts: Option<i64>,
     },
@@ -364,11 +385,13 @@ pub enum MarketCmd {
         /// Series ticker
         #[arg(long)]
         series_ticker: String,
-        /// Period (e.g. 1, 60, 1440)
+        /// Period in minutes (e.g. 1, 60, 1440)
         #[arg(long)]
         period: Option<i64>,
+        /// Start unix timestamp
         #[arg(long)]
         start_ts: Option<i64>,
+        /// End unix timestamp
         #[arg(long)]
         end_ts: Option<i64>,
     },
@@ -385,11 +408,13 @@ pub enum MarketCmd {
         /// Comma-separated market tickers (up to 100)
         #[arg(long)]
         tickers: String,
+        /// Start unix timestamp
         #[arg(long)]
         start_ts: Option<i64>,
+        /// End unix timestamp
         #[arg(long)]
         end_ts: Option<i64>,
-        /// Period (e.g. 1, 60, 1440)
+        /// Period in minutes (e.g. 1, 60, 1440)
         #[arg(long)]
         period: Option<i64>,
     },
@@ -397,12 +422,16 @@ pub enum MarketCmd {
     Search {
         /// Search query (matched against title and ticker)
         query: String,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by status (e.g. open, closed, settled)
         #[arg(long)]
         status: Option<String>,
         /// Include combo/multivariate markets (excluded by default)
@@ -448,6 +477,23 @@ pub enum MarketCmd {
         #[arg(long)]
         sell: Option<i64>,
     },
+    /// Price history with human-friendly time ranges (auto-resolves series ticker)
+    History {
+        /// Market ticker
+        ticker: String,
+        /// Time interval: 1m, 5m, 1h, 6h, 1d, 1w
+        #[arg(long, default_value = "1h")]
+        interval: String,
+        /// Lookback period: 1d, 1w, 1m, 3m, 1y
+        #[arg(long, default_value = "1w")]
+        period: String,
+    },
+    /// Get current prices for multiple markets at once
+    Prices {
+        /// Market tickers (space-separated)
+        #[arg(required = true)]
+        tickers: Vec<String>,
+    },
     /// Show implied probability distribution for an event's markets
     #[command(alias = "distribution")]
     Dist {
@@ -474,19 +520,25 @@ pub enum MarketCmd {
 pub enum EventCmd {
     /// List events
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by status (e.g. open, closed, settled)
         #[arg(long)]
         status: Option<String>,
+        /// Filter by series ticker
         #[arg(long)]
         series_ticker: Option<String>,
         /// Filter by category (e.g. "Elections", "Sports", "Financials")
         #[arg(long)]
         category: Option<String>,
+        /// Include nested markets in response
         #[arg(long)]
         with_nested_markets: bool,
     },
@@ -494,6 +546,7 @@ pub enum EventCmd {
     Get {
         /// Event ticker
         event_ticker: String,
+        /// Include nested markets in response
         #[arg(long)]
         with_nested_markets: bool,
     },
@@ -505,14 +558,19 @@ pub enum EventCmd {
     /// List multivariate events
     #[command(alias = "multivariates")]
     Multivariate {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Filter by series ticker
         #[arg(long)]
         series_ticker: Option<String>,
+        /// Filter by collection ticker
         #[arg(long)]
         collection_ticker: Option<String>,
+        /// Include nested markets in response
         #[arg(long)]
         with_nested_markets: bool,
     },
@@ -524,11 +582,13 @@ pub enum EventCmd {
         /// Series ticker
         #[arg(long)]
         series_ticker: String,
+        /// Start unix timestamp
         #[arg(long)]
         start_ts: Option<i64>,
+        /// End unix timestamp
         #[arg(long)]
         end_ts: Option<i64>,
-        /// Period (e.g. 1, 60, 1440)
+        /// Period in minutes (e.g. 1, 60, 1440)
         #[arg(long)]
         period: Option<i64>,
     },
@@ -560,10 +620,13 @@ pub enum EventCmd {
 pub enum SeriesCmd {
     /// List series
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -630,14 +693,19 @@ pub enum OrderCmd {
     },
     /// List orders
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Filter by status (e.g. resting, executed, canceled)
         #[arg(long)]
         status: Option<String>,
     },
@@ -715,10 +783,13 @@ pub enum OrderCmd {
 pub enum OrderGroupCmd {
     /// List order groups
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -767,48 +838,66 @@ pub enum PortfolioCmd {
     /// Get open positions
     #[command(alias = "positions")]
     Position {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Filter by event ticker
         #[arg(long, alias = "event")]
         event_ticker: Option<String>,
+        /// Filter by count (e.g. gt:0)
         #[arg(long)]
         count_filter: Option<String>,
+        /// Filter by settlement status (e.g. unsettled, settled)
         #[arg(long)]
         settlement_status: Option<String>,
     },
     /// Get trade fills
     #[command(alias = "fills")]
     Fill {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Filter by order ID
         #[arg(long)]
         order_id: Option<String>,
+        /// Only fills after this unix timestamp
         #[arg(long)]
         min_ts: Option<i64>,
+        /// Only fills before this unix timestamp
         #[arg(long)]
         max_ts: Option<i64>,
     },
     /// Get settlement history
     #[command(alias = "settlements")]
     Settlement {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
     },
@@ -825,32 +914,44 @@ pub enum HistoricalCmd {
     /// List historical markets
     #[command(alias = "markets")]
     Market {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Only markets closed after this unix timestamp
         #[arg(long)]
         min_close_ts: Option<i64>,
+        /// Only markets closed before this unix timestamp
         #[arg(long)]
         max_close_ts: Option<i64>,
     },
     /// List trades on settled markets (for active market trades, use `market trade`)
     #[command(alias = "trades")]
     Trade {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Only trades after this unix timestamp
         #[arg(long)]
         min_ts: Option<i64>,
+        /// Only trades before this unix timestamp
         #[arg(long)]
         max_ts: Option<i64>,
     },
@@ -862,11 +963,13 @@ pub enum HistoricalCmd {
         /// Series ticker
         #[arg(long)]
         series_ticker: String,
-        /// Period
+        /// Period in minutes (e.g. 1, 60, 1440)
         #[arg(long)]
         period: Option<i64>,
+        /// Start unix timestamp
         #[arg(long)]
         start_ts: Option<i64>,
+        /// End unix timestamp
         #[arg(long)]
         end_ts: Option<i64>,
     },
@@ -875,24 +978,32 @@ pub enum HistoricalCmd {
     /// Get historical fills (requires auth)
     #[command(alias = "fills")]
     Fill {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
     },
     /// Get historical orders (requires auth)
     #[command(alias = "orders")]
     Order {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
     },
@@ -930,10 +1041,13 @@ pub enum SubaccountCmd {
     /// List transfers
     #[command(alias = "transfers")]
     TransferList {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -984,10 +1098,13 @@ pub enum ApiKeyCmd {
 pub enum RfqCmd {
     /// List RFQs
     List {
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -1084,22 +1201,31 @@ pub enum MilestoneCmd {
         /// Number of results (1-500)
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Only milestones starting after this date (YYYY-MM-DD)
         #[arg(long)]
         minimum_start_date: Option<String>,
+        /// Filter by category
         #[arg(long)]
         category: Option<String>,
+        /// Filter by competition
         #[arg(long)]
         competition: Option<String>,
+        /// Filter by source ID
         #[arg(long)]
         source_id: Option<String>,
+        /// Filter by milestone type
         #[arg(long, name = "type")]
         milestone_type: Option<String>,
+        /// Filter by related event ticker
         #[arg(long)]
         related_event_ticker: Option<String>,
+        /// Only milestones updated after this unix timestamp
         #[arg(long)]
         min_updated_ts: Option<i64>,
     },
@@ -1136,14 +1262,19 @@ pub enum LiveDataCmd {
 pub enum StructuredTargetCmd {
     /// List structured targets
     List {
+        /// Filter by target type
         #[arg(long, name = "type")]
         target_type: Option<String>,
+        /// Filter by competition
         #[arg(long)]
         competition: Option<String>,
+        /// Results per page
         #[arg(long)]
         page_size: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -1160,14 +1291,19 @@ pub enum StructuredTargetCmd {
 pub enum IncentiveProgramCmd {
     /// List incentive programs
     List {
+        /// Filter by status
         #[arg(long)]
         status: Option<String>,
+        /// Filter by program type
         #[arg(long, name = "type")]
         program_type: Option<String>,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -1183,20 +1319,28 @@ pub enum FcmCmd {
         /// Subtrader ID (required)
         #[arg(long)]
         subtrader_id: String,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
+        /// Filter by event ticker
         #[arg(long, alias = "event")]
         event_ticker: Option<String>,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Only orders after this unix timestamp
         #[arg(long)]
         min_ts: Option<i64>,
+        /// Only orders before this unix timestamp
         #[arg(long)]
         max_ts: Option<i64>,
+        /// Filter by status
         #[arg(long)]
         status: Option<String>,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
     },
@@ -1206,18 +1350,25 @@ pub enum FcmCmd {
         /// Subtrader ID (required)
         #[arg(long)]
         subtrader_id: String,
+        /// Filter by market ticker
         #[arg(long)]
         ticker: Option<String>,
+        /// Filter by event ticker
         #[arg(long, alias = "event")]
         event_ticker: Option<String>,
+        /// Filter by count (e.g. gt:0)
         #[arg(long)]
         count_filter: Option<String>,
+        /// Filter by settlement status (e.g. unsettled, settled)
         #[arg(long)]
         settlement_status: Option<String>,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -1229,16 +1380,22 @@ pub enum FcmCmd {
 pub enum CollectionCmd {
     /// List collections
     List {
+        /// Filter by status
         #[arg(long)]
         status: Option<String>,
+        /// Filter by associated event ticker
         #[arg(long)]
         associated_event_ticker: Option<String>,
+        /// Filter by series ticker
         #[arg(long)]
         series_ticker: Option<String>,
+        /// Max results to return
         #[arg(long)]
         limit: Option<u32>,
+        /// Pagination cursor from a previous response
         #[arg(long)]
         cursor: Option<String>,
+        /// Fetch all pages
         #[arg(long)]
         all: bool,
     },
@@ -1254,6 +1411,7 @@ pub enum CollectionCmd {
         /// Path to JSON file with selected_markets array
         #[arg(long)]
         file: PathBuf,
+        /// Include market payload in response
         #[arg(long)]
         with_market_payload: bool,
     },
@@ -1302,16 +1460,20 @@ pub enum ExportCmd {
     /// Export positions
     #[command(alias = "positions")]
     Position {
+        /// Output format
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
+        /// Output file path
         #[arg(short = 'o', long = "file")]
         file: PathBuf,
     },
     /// Export settlements
     #[command(alias = "settlements")]
     Settlement {
+        /// Output format
         #[arg(long, default_value = "csv")]
         format: ExportFormat,
+        /// Output file path
         #[arg(short = 'o', long = "file")]
         file: PathBuf,
     },

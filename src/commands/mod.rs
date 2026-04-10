@@ -26,3 +26,6 @@ pub mod trade;
 pub mod ticker;
 pub mod url;
 pub mod watch;
+pub mod ping;
+pub mod shell;
+pub mod upgrade;

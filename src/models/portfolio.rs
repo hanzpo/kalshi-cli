@@ -20,18 +20,20 @@ pub struct BalanceResponse {
 
 impl TableDisplay for Balance {
     fn headers() -> Vec<&'static str> {
-        vec![
-            "Balance (cents)",
-            "Portfolio Value (cents)",
-            "Payout (cents)",
-        ]
+        vec!["Balance", "Portfolio Value", "Payout"]
     }
 
     fn row(&self) -> Vec<String> {
         vec![
-            format_opt(&self.balance),
-            format_opt(&self.portfolio_value),
-            format_opt(&self.payout),
+            self.balance
+                .map(|c| format!("${:.2}", c as f64 / 100.0))
+                .unwrap_or("-".into()),
+            self.portfolio_value
+                .map(|c| format!("${:.2}", c as f64 / 100.0))
+                .unwrap_or("-".into()),
+            self.payout
+                .map(|c| format!("${:.2}", c as f64 / 100.0))
+                .unwrap_or("-".into()),
         ]
     }
 }
@@ -267,14 +269,7 @@ mod tests {
     #[test]
     fn test_balance_headers() {
         let headers = Balance::headers();
-        assert_eq!(
-            headers,
-            vec![
-                "Balance (cents)",
-                "Portfolio Value (cents)",
-                "Payout (cents)"
-            ]
-        );
+        assert_eq!(headers, vec!["Balance", "Portfolio Value", "Payout"]);
     }
 
     #[test]
@@ -285,9 +280,9 @@ mod tests {
             payout: Some(2000),
         };
         let row = balance.row();
-        assert_eq!(row[0], "10000");
-        assert_eq!(row[1], "5000");
-        assert_eq!(row[2], "2000");
+        assert_eq!(row[0], "$100.00");
+        assert_eq!(row[1], "$50.00");
+        assert_eq!(row[2], "$20.00");
     }
 
     #[test]
