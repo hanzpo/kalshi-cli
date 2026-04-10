@@ -54,7 +54,7 @@ where
             limit: None,
             cursor,
             all: true,
-            max_page_size: max_page_size,
+            max_page_size,
         };
         let result = auto_paginate(&opts, fetcher).await?;
         output_paginated(&result.items, result.has_more, format)
@@ -66,52 +66,55 @@ where
         let api_cursor: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
         let api_exhausted: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
 
-        browse::browse(BROWSE_PAGE_SIZE, |_page_limit, page_cursor: Option<String>| {
-            let initial_cursor = initial_cursor.clone();
-            async {
-                // First, drain any buffered items from a previous oversized response.
-                {
-                    let mut buf = buffer.lock().unwrap();
-                    if !buf.is_empty() {
-                        let take = buf.len().min(page_size);
-                        let chunk: Vec<T> = buf.drain(..take).collect();
-                        let cursor = if buf.is_empty() {
-                            api_cursor.lock().unwrap().clone()
-                        } else {
-                            Some("__buffered__".to_string())
-                        };
-                        return Ok((chunk, cursor));
+        browse::browse(
+            BROWSE_PAGE_SIZE,
+            |_page_limit, page_cursor: Option<String>| {
+                let initial_cursor = initial_cursor.clone();
+                async {
+                    // First, drain any buffered items from a previous oversized response.
+                    {
+                        let mut buf = buffer.lock().unwrap();
+                        if !buf.is_empty() {
+                            let take = buf.len().min(page_size);
+                            let chunk: Vec<T> = buf.drain(..take).collect();
+                            let cursor = if buf.is_empty() {
+                                api_cursor.lock().unwrap().clone()
+                            } else {
+                                Some("__buffered__".to_string())
+                            };
+                            return Ok((chunk, cursor));
+                        }
+                    }
+
+                    if *api_exhausted.lock().unwrap() {
+                        return Ok((Vec::new(), None));
+                    }
+
+                    let effective_cursor = match page_cursor {
+                        Some(ref c) if c == "__buffered__" => api_cursor.lock().unwrap().clone(),
+                        Some(_) => page_cursor,
+                        None => initial_cursor,
+                    };
+
+                    // Request only what we need for one display page.
+                    let (mut items, next_cursor) =
+                        fetcher(BROWSE_PAGE_SIZE, effective_cursor).await?;
+
+                    if next_cursor.as_ref().is_none_or(|c| c.is_empty()) {
+                        *api_exhausted.lock().unwrap() = true;
+                    }
+
+                    if items.len() > page_size {
+                        let overflow = items.split_off(page_size);
+                        *buffer.lock().unwrap() = overflow;
+                        *api_cursor.lock().unwrap() = next_cursor;
+                        Ok((items, Some("__buffered__".to_string())))
+                    } else {
+                        Ok((items, next_cursor))
                     }
                 }
-
-                if *api_exhausted.lock().unwrap() {
-                    return Ok((Vec::new(), None));
-                }
-
-                let effective_cursor = match page_cursor {
-                    Some(ref c) if c == "__buffered__" => api_cursor.lock().unwrap().clone(),
-                    Some(_) => page_cursor,
-                    None => initial_cursor,
-                };
-
-                // Request only what we need for one display page.
-                let (mut items, next_cursor) =
-                    fetcher(BROWSE_PAGE_SIZE, effective_cursor).await?;
-
-                if next_cursor.as_ref().is_none_or(|c| c.is_empty()) {
-                    *api_exhausted.lock().unwrap() = true;
-                }
-
-                if items.len() > page_size {
-                    let overflow = items.split_off(page_size);
-                    *buffer.lock().unwrap() = overflow;
-                    *api_cursor.lock().unwrap() = next_cursor;
-                    Ok((items, Some("__buffered__".to_string())))
-                } else {
-                    Ok((items, next_cursor))
-                }
-            }
-        })
+            },
+        )
         .await
     } else {
         let opts = PaginationOpts {
@@ -164,7 +167,9 @@ where
         cursor = next_cursor;
     }
 
-    if !opts.all && let Some(limit) = opts.limit {
+    if !opts.all
+        && let Some(limit) = opts.limit
+    {
         all_items.truncate(limit as usize);
     }
 

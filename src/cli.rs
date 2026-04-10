@@ -4,9 +4,7 @@ use clap::{Parser, Subcommand};
 
 use crate::output::OutputFormat;
 
-
 pub const BANNER: &str = "\
-\x1b[32m\
 \n ██╗  ██╗ █████╗ ██╗     ███████╗██╗  ██╗██╗\
 \n ██║ ██╔╝██╔══██╗██║     ██╔════╝██║  ██║██║\
 \n █████╔╝ ███████║██║     ███████╗███████║██║\
@@ -14,10 +12,14 @@ pub const BANNER: &str = "\
 \n ██║  ██╗██║  ██║███████╗███████║██║  ██║██║\
 \n ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝\
 \n              Trade on anything.\
-\n\x1b[0m";
+\n";
 
 #[derive(Parser)]
-#[command(name = "kalshi", about = "CLI for the Kalshi prediction market API", version, before_help = BANNER)]
+#[command(
+    name = "kalshi",
+    about = "CLI for the Kalshi prediction market API",
+    version
+)]
 pub struct Cli {
     /// Use demo environment
     #[arg(long, global = true)]
@@ -418,7 +420,7 @@ pub enum MarketCmd {
         #[arg(long)]
         period: Option<i64>,
     },
-    /// Search markets by keyword (client-side filter)
+    /// Search markets by text query
     Search {
         /// Search query (matched against title and ticker)
         query: String,

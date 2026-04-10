@@ -28,14 +28,25 @@ pub async fn execute(client: &KalshiClient, cmd: ExchangeCmd, out: &OutputConfig
             } else {
                 // Render a human-readable schedule table
                 let mut text = String::from("=== Exchange Schedule ===\n\n");
-                if let Some(ref schedule) = resp.schedule {
-                    if let Some(ref hours) = schedule.standard_hours {
-                        let days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-                        if let Some(entries) = hours.as_array() {
-                            for entry in entries {
-                                for day in &days {
-                                    if let Some(slots) = entry.get(day).and_then(|v| v.as_array()) {
-                                        let windows: Vec<String> = slots.iter().filter_map(|slot| {
+                if let Some(ref schedule) = resp.schedule
+                    && let Some(ref hours) = schedule.standard_hours
+                {
+                    let days = [
+                        "monday",
+                        "tuesday",
+                        "wednesday",
+                        "thursday",
+                        "friday",
+                        "saturday",
+                        "sunday",
+                    ];
+                    if let Some(entries) = hours.as_array() {
+                        for entry in entries {
+                            for day in &days {
+                                if let Some(slots) = entry.get(day).and_then(|v| v.as_array()) {
+                                    let windows: Vec<String> = slots
+                                        .iter()
+                                        .filter_map(|slot| {
                                             let open = slot.get("open_time")?.as_str()?;
                                             let close = slot.get("close_time")?.as_str()?;
                                             if open == close {
@@ -43,10 +54,16 @@ pub async fn execute(client: &KalshiClient, cmd: ExchangeCmd, out: &OutputConfig
                                             } else {
                                                 Some(format!("{} – {}", open, close))
                                             }
-                                        }).collect();
-                                        let label = format!("{:<11}", format!("{}:", day[..1].to_uppercase().to_string() + &day[1..]));
-                                        text.push_str(&format!("  {} {}\n", label, windows.join(", ")));
-                                    }
+                                        })
+                                        .collect();
+                                    let label = format!(
+                                        "{:<11}",
+                                        format!(
+                                            "{}:",
+                                            day[..1].to_uppercase().to_string() + &day[1..]
+                                        )
+                                    );
+                                    text.push_str(&format!("  {} {}\n", label, windows.join(", ")));
                                 }
                             }
                         }

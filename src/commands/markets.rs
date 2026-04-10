@@ -3,12 +3,14 @@ use anyhow::Result;
 use crate::browse;
 use crate::cli::MarketCmd;
 use crate::client::KalshiClient;
+use crate::color;
 use crate::models::market::{
     CandlesticksResponse, MarketResponse, MarketsResponse, OrderbookResponse, TradesResponse,
 };
-use crate::color;
 use crate::output::{OutputConfig, output, output_one, output_paginated, paged_print, print_json};
-use crate::pagination::{DEFAULT_DISPLAY_LIMIT, MARKETS_PAGE_SIZE, PaginationOpts, auto_paginate, paginated_list};
+use crate::pagination::{
+    DEFAULT_DISPLAY_LIMIT, MARKETS_PAGE_SIZE, PaginationOpts, auto_paginate, paginated_list,
+};
 
 /// Maximum number of markets to scan for aggregate commands (hot, expiring, spread).
 /// With 1000/page and 200ms throttle, 20000 = 20 requests ≈ 4 seconds.
@@ -65,7 +67,6 @@ async fn fetch_markets_page(
     Ok((resp.markets.unwrap_or_default(), resp.cursor))
 }
 
-
 pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfig) -> Result<()> {
     match cmd {
         MarketCmd::List {
@@ -79,39 +80,46 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             search,
         } => {
             let search_lower = search.map(|s| s.to_lowercase());
-            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), format, |page_limit, page_cursor| {
-                let status = status.clone();
-                let series_ticker = series_ticker.clone();
-                let event_ticker = event_ticker.clone();
-                let search_lower = search_lower.clone();
-                async move {
-                    let query = build_market_query(
-                        page_limit,
-                        page_cursor,
-                        &status,
-                        &series_ticker,
-                        &event_ticker,
-                        include_combos,
-                    );
-                    let (markets, cursor) = fetch_markets_page(client, &query).await?;
-                    let filtered = if let Some(ref needle) = search_lower {
-                        markets
-                            .into_iter()
-                            .filter(|m| {
-                                m.title
-                                    .as_ref()
-                                    .is_some_and(|t| t.to_lowercase().contains(needle))
-                                    || m.ticker
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                Some(MARKETS_PAGE_SIZE),
+                format,
+                |page_limit, page_cursor| {
+                    let status = status.clone();
+                    let series_ticker = series_ticker.clone();
+                    let event_ticker = event_ticker.clone();
+                    let search_lower = search_lower.clone();
+                    async move {
+                        let query = build_market_query(
+                            page_limit,
+                            page_cursor,
+                            &status,
+                            &series_ticker,
+                            &event_ticker,
+                            include_combos,
+                        );
+                        let (markets, cursor) = fetch_markets_page(client, &query).await?;
+                        let filtered = if let Some(ref needle) = search_lower {
+                            markets
+                                .into_iter()
+                                .filter(|m| {
+                                    m.title
                                         .as_ref()
                                         .is_some_and(|t| t.to_lowercase().contains(needle))
-                            })
-                            .collect()
-                    } else {
-                        markets
-                    };
-                    Ok((filtered, cursor))
-                }
-            })
+                                        || m.ticker
+                                            .as_ref()
+                                            .is_some_and(|t| t.to_lowercase().contains(needle))
+                                })
+                                .collect()
+                        } else {
+                            markets
+                        };
+                        Ok((filtered, cursor))
+                    }
+                },
+            )
             .await?;
         }
         MarketCmd::Get { ticker } => {
@@ -123,8 +131,10 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                     let msg = e.to_string();
                     if msg.contains("404") {
                         eprintln!("Error: market '{}' not found.", upper);
-                        eprintln!("Hint: try `kalshi market search \"{}\"` to find matching markets.",
-                            upper.split('-').next().unwrap_or(&upper));
+                        eprintln!(
+                            "Hint: try `kalshi market search \"{}\"` to find matching markets.",
+                            upper.split('-').next().unwrap_or(&upper)
+                        );
                         return Err(e);
                     }
                     return Err(e);
@@ -139,31 +149,39 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             min_ts,
             max_ts,
         } => {
-            paginated_list(all, limit, cursor, Some(MARKETS_PAGE_SIZE), format, |page_limit: u32, page_cursor: Option<String>| {
-                let ticker = ticker.clone();
-                async move {
-                    let mut query: Vec<(String, String)> =
-                        vec![("limit".to_string(), page_limit.to_string())];
-                    if let Some(c) = page_cursor {
-                        query.push(("cursor".to_string(), c));
+            paginated_list(
+                all,
+                limit,
+                cursor,
+                Some(MARKETS_PAGE_SIZE),
+                format,
+                |page_limit: u32, page_cursor: Option<String>| {
+                    let ticker = ticker.clone();
+                    async move {
+                        let mut query: Vec<(String, String)> =
+                            vec![("limit".to_string(), page_limit.to_string())];
+                        if let Some(c) = page_cursor {
+                            query.push(("cursor".to_string(), c));
+                        }
+                        if let Some(ref t) = ticker {
+                            query.push(("ticker".to_string(), t.clone()));
+                        }
+                        if let Some(ts) = min_ts {
+                            query.push(("min_ts".to_string(), ts.to_string()));
+                        }
+                        if let Some(ts) = max_ts {
+                            query.push(("max_ts".to_string(), ts.to_string()));
+                        }
+                        let query_refs: Vec<(&str, &str)> = query
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect();
+                        let resp: TradesResponse =
+                            client.get("/markets/trades", &query_refs).await?;
+                        Ok((resp.trades.unwrap_or_default(), resp.cursor))
                     }
-                    if let Some(ref t) = ticker {
-                        query.push(("ticker".to_string(), t.clone()));
-                    }
-                    if let Some(ts) = min_ts {
-                        query.push(("min_ts".to_string(), ts.to_string()));
-                    }
-                    if let Some(ts) = max_ts {
-                        query.push(("max_ts".to_string(), ts.to_string()));
-                    }
-                    let query_refs: Vec<(&str, &str)> = query
-                        .iter()
-                        .map(|(k, v)| (k.as_str(), v.as_str()))
-                        .collect();
-                    let resp: TradesResponse = client.get("/markets/trades", &query_refs).await?;
-                    Ok((resp.trades.unwrap_or_default(), resp.cursor))
-                }
-            })
+                },
+            )
             .await?;
         }
         MarketCmd::Candlestick {
@@ -173,7 +191,11 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             start_ts,
             end_ts,
         } => {
-            let path = format!("/series/{}/markets/{}/candlesticks", series_ticker.to_uppercase(), ticker.to_uppercase());
+            let path = format!(
+                "/series/{}/markets/{}/candlesticks",
+                series_ticker.to_uppercase(),
+                ticker.to_uppercase()
+            );
             let mut query = Vec::new();
             let period_str = period.map(|p| p.to_string());
             // Default to last 7 days if not specified (API requires both start_ts and end_ts)
@@ -226,11 +248,10 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                         cursor_val = c.clone();
                         params.push(("cursor", &cursor_val));
                     }
-                    let resp: SearchResponse =
-                        client.get_absolute(&search_url, &params).await?;
+                    let resp: SearchResponse = client.get_absolute(&search_url, &params).await?;
                     let items = resp.current_page.unwrap_or_default();
-                    let done = items.is_empty()
-                        || resp.next_cursor.as_ref().is_none_or(|c| c.is_empty());
+                    let done =
+                        items.is_empty() || resp.next_cursor.as_ref().is_none_or(|c| c.is_empty());
                     all_items.extend(items);
                     if done {
                         break;
@@ -280,8 +301,7 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                     cursor_val = c.clone();
                     params.push(("cursor", &cursor_val));
                 }
-                let resp: SearchResponse =
-                    client.get_absolute(&search_url, &params).await?;
+                let resp: SearchResponse = client.get_absolute(&search_url, &params).await?;
                 let items = resp.current_page.unwrap_or_default();
                 let has_more = resp.next_cursor.as_ref().is_some_and(|c| !c.is_empty());
                 if let Some(total) = resp.total_results_count {
@@ -330,7 +350,10 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 None => eprintln!("No orderbook data for {}", ticker),
             }
         }
-        MarketCmd::Hot { limit: top_n, include_combos } => {
+        MarketCmd::Hot {
+            limit: top_n,
+            include_combos,
+        } => {
             let opts = PaginationOpts {
                 limit: Some(SCAN_LIMIT),
                 cursor: None,
@@ -341,24 +364,46 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let status = status.clone();
                 async move {
-                    let query = build_market_query(page_limit, page_cursor, &status, &None, &None, include_combos);
+                    let query = build_market_query(
+                        page_limit,
+                        page_cursor,
+                        &status,
+                        &None,
+                        &None,
+                        include_combos,
+                    );
                     fetch_markets_page(client, &query).await
                 }
             })
             .await?;
 
             let get_volume = |m: &crate::models::market::Market| -> f64 {
-                m.volume_24h.map(|v| v as f64)
-                    .or_else(|| m.extra.get("volume_24h_fp").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                m.volume_24h
+                    .map(|v| v as f64)
+                    .or_else(|| {
+                        m.extra
+                            .get("volume_24h_fp")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
                     .or_else(|| m.volume.map(|v| v as f64))
-                    .or_else(|| m.extra.get("volume_fp").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                    .or_else(|| {
+                        m.extra
+                            .get("volume_fp")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                    })
                     .unwrap_or(0.0)
             };
-            let mut markets: Vec<_> = result.items.into_iter()
+            let mut markets: Vec<_> = result
+                .items
+                .into_iter()
                 .filter(|m| get_volume(m) > 0.0)
                 .collect();
             markets.sort_by(|a, b| {
-                get_volume(b).partial_cmp(&get_volume(a)).unwrap_or(std::cmp::Ordering::Equal)
+                get_volume(b)
+                    .partial_cmp(&get_volume(a))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
             markets.truncate(top_n as usize);
             if result.has_more {
@@ -366,7 +411,11 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             }
             output(&markets, format)?;
         }
-        MarketCmd::Expiring { within, limit: top_n, include_combos } => {
+        MarketCmd::Expiring {
+            within,
+            limit: top_n,
+            include_combos,
+        } => {
             let opts = PaginationOpts {
                 limit: Some(SCAN_LIMIT),
                 cursor: None,
@@ -377,7 +426,14 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let status = status.clone();
                 async move {
-                    let query = build_market_query(page_limit, page_cursor, &status, &None, &None, include_combos);
+                    let query = build_market_query(
+                        page_limit,
+                        page_cursor,
+                        &status,
+                        &None,
+                        &None,
+                        include_combos,
+                    );
                     fetch_markets_page(client, &query).await
                 }
             })
@@ -390,7 +446,9 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
                 .items
                 .into_iter()
                 .filter(|m| {
-                    if let Some(ref ct) = m.close_time && let Ok(t) = chrono::DateTime::parse_from_rfc3339(ct) {
+                    if let Some(ref ct) = m.close_time
+                        && let Ok(t) = chrono::DateTime::parse_from_rfc3339(ct)
+                    {
                         let t_utc = t.with_timezone(&chrono::Utc);
                         return t_utc > now && t_utc <= cutoff;
                     }
@@ -409,7 +467,10 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             }
             output(&expiring, format)?;
         }
-        MarketCmd::Spread { limit: top_n, include_combos } => {
+        MarketCmd::Spread {
+            limit: top_n,
+            include_combos,
+        } => {
             let opts = PaginationOpts {
                 limit: Some(SCAN_LIMIT),
                 cursor: None,
@@ -420,17 +481,34 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
             let result = auto_paginate(&opts, |page_limit, page_cursor| {
                 let status = status.clone();
                 async move {
-                    let query = build_market_query(page_limit, page_cursor, &status, &None, &None, include_combos);
+                    let query = build_market_query(
+                        page_limit,
+                        page_cursor,
+                        &status,
+                        &None,
+                        &None,
+                        include_combos,
+                    );
                     fetch_markets_page(client, &query).await
                 }
             })
             .await?;
 
             let get_bid = |m: &crate::models::market::Market| -> Option<f64> {
-                m.yes_bid.or_else(|| m.extra.get("yes_bid_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                m.yes_bid.or_else(|| {
+                    m.extra
+                        .get("yes_bid_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())
+                })
             };
             let get_ask = |m: &crate::models::market::Market| -> Option<f64> {
-                m.yes_ask.or_else(|| m.extra.get("yes_ask_dollars").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()))
+                m.yes_ask.or_else(|| {
+                    m.extra
+                        .get("yes_ask_dollars")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())
+                })
             };
             let mut markets: Vec<_> = result
                 .items
@@ -463,7 +541,8 @@ pub async fn execute(client: &KalshiClient, cmd: MarketCmd, format: &OutputConfi
         } => {
             // Fetch all markets for this event
             let event_ticker = event_ticker.to_uppercase();
-            let query = build_market_query(1000, None, &None, &None, &Some(event_ticker.clone()), false);
+            let query =
+                build_market_query(1000, None, &None, &None, &Some(event_ticker.clone()), false);
             let (markets, _) = fetch_markets_page(client, &query).await?;
             if markets.is_empty() {
                 eprintln!("No markets found for event {}", event_ticker);
@@ -626,9 +705,7 @@ fn parse_interval(s: &str) -> anyhow::Result<i64> {
         "6h" => Ok(360),
         "1d" => Ok(1440),
         "1w" => Ok(10080),
-        _ => anyhow::bail!(
-            "Invalid interval '{s}'. Valid values: 1m, 5m, 1h, 6h, 1d, 1w"
-        ),
+        _ => anyhow::bail!("Invalid interval '{s}'. Valid values: 1m, 5m, 1h, 6h, 1d, 1w"),
     }
 }
 
@@ -639,9 +716,7 @@ fn parse_period(s: &str) -> anyhow::Result<i64> {
         "1m" => Ok(30 * 86_400),
         "3m" => Ok(90 * 86_400),
         "1y" => Ok(365 * 86_400),
-        _ => anyhow::bail!(
-            "Invalid period '{s}'. Valid values: 1d, 1w, 1m, 3m, 1y"
-        ),
+        _ => anyhow::bail!("Invalid period '{s}'. Valid values: 1d, 1w, 1m, 3m, 1y"),
     }
 }
 
@@ -683,7 +758,13 @@ fn render_dist_colored(
             if bid == 0.0 && ask == 0.0 {
                 return None;
             }
-            Some(if bid == 0.0 { ask } else if ask == 0.0 { bid } else { (bid + ask) / 2.0 })
+            Some(if bid == 0.0 {
+                ask
+            } else if ask == 0.0 {
+                bid
+            } else {
+                (bid + ask) / 2.0
+            })
         }
     };
 
@@ -708,9 +789,11 @@ fn render_dist_colored(
             .iter()
             .filter_map(|m| {
                 let prob = get_prob(m)?;
-                let label = m.yes_sub_title.as_ref()
+                let label = m
+                    .yes_sub_title
+                    .as_ref()
                     .or(m.subtitle.as_ref())
-                    .or_else(|| m.ticker.as_ref())
+                    .or(m.ticker.as_ref())
                     .cloned()
                     .unwrap_or_else(|| "-".to_string());
                 Some((label, prob))
@@ -762,12 +845,22 @@ fn render_dist_colored(
     }
 
     let max_prob = display.iter().map(|(_, p)| *p).fold(0.0_f64, f64::max);
-    let label_width = display.iter().map(|(l, _)| l.chars().count()).max().unwrap_or(10);
+    let label_width = display
+        .iter()
+        .map(|(l, _)| l.chars().count())
+        .max()
+        .unwrap_or(10);
 
     let mut out = String::new();
 
     if cdf {
-        let price_label = if use_ask { "ask" } else if use_bid { "bid" } else { "mid" };
+        let price_label = if use_ask {
+            "ask"
+        } else if use_bid {
+            "bid"
+        } else {
+            "mid"
+        };
         out.push_str(&format!(
             "  {}  P(X >= strike), {} price\n\n",
             color::green("SURVIVAL CDF", color_enabled),
@@ -963,7 +1056,8 @@ mod tests {
         let status = Some("open".to_string());
         let series = Some("SER-1".to_string());
         let event = Some("EVT-1".to_string());
-        let query = build_market_query(25, Some("cur".to_string()), &status, &series, &event, false);
+        let query =
+            build_market_query(25, Some("cur".to_string()), &status, &series, &event, false);
         assert_eq!(query.len(), 6);
         assert_eq!(query[0].0, "limit");
         assert_eq!(query[1], ("cursor".to_string(), "cur".to_string()));
@@ -994,7 +1088,11 @@ mod tests {
 
     // ── render_dist tests ──
 
-    fn make_strike_market(strike: f64, yes_bid: f64, yes_ask: f64) -> crate::models::market::Market {
+    fn make_strike_market(
+        strike: f64,
+        yes_bid: f64,
+        yes_ask: f64,
+    ) -> crate::models::market::Market {
         crate::models::market::Market {
             ticker: Some(format!("T-G{}", strike as i64)),
             yes_sub_title: Some(format!("At least {}", strike as i64)),
@@ -1016,9 +1114,9 @@ mod tests {
         ];
         let out = render_dist_colored(&markets, false, 20, false, false, false);
         assert!(out.contains("PROBABILITY DENSITY"));
-        assert!(out.contains("50\u{2013}100"));   // range label with en-dash
+        assert!(out.contains("50\u{2013}100")); // range label with en-dash
         assert!(out.contains("100\u{2013}200"));
-        assert!(out.contains("200+"));            // last bucket
+        assert!(out.contains("200+")); // last bucket
         assert!(out.contains("30.0%"));
         assert!(out.contains("40.0%"));
         assert!(out.contains("20.0%"));

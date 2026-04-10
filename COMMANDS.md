@@ -214,6 +214,5 @@ kalshi
     ├── --no-color                  Disable colors
     ├── --quiet / -q                Print only IDs/tickers
     ├── --yes / -y                  Skip confirmation prompts
-    ├── --verbose / -v              Show request details
     └── --profile <name>            Config profile to use
 ```

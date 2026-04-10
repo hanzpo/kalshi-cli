@@ -91,7 +91,6 @@ pub fn format_opt<T: std::fmt::Display>(val: &Option<T>) -> String {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_format_opt_some_float() {
-        assert_eq!(format_opt(&Some(3.14)), "3.14");
+        assert_eq!(format_opt(&Some(2.5)), "2.5");
     }
 
     #[test]

@@ -236,7 +236,6 @@ demo = true
 | `--no-color` | Disable colored output |
 | `-q, --quiet` | Print only IDs/tickers (one per line) |
 | `-y, --yes` | Skip confirmation prompts |
-| `-v, --verbose` | Show HTTP request details |
 
 ## Shell completions
 

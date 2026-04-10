@@ -16,16 +16,25 @@ mod websocket;
 use std::io::IsTerminal;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
-use cli::{Cli, Command};
+use cli::{BANNER, Cli, Command};
 use client::KalshiClient;
 use config::Config;
 use output::OutputConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let args: Vec<_> = std::env::args_os().collect();
+    if args.len() == 1 {
+        print_banner(std::io::stdout().is_terminal() && std::env::var("NO_COLOR").is_err());
+        let mut cmd = Cli::command();
+        cmd.print_help()?;
+        println!();
+        return Ok(());
+    }
+
+    let cli = Cli::parse_from(args);
 
     // Commands that don't need a client
     if matches!(cli.command, Command::Config { .. })
@@ -57,9 +66,8 @@ async fn main() -> Result<()> {
     let config = config.resolve(profile)?;
     let demo = cli.demo || config.demo.unwrap_or(false);
     let client = KalshiClient::new(&config, demo)?;
-    let color = !cli.no_color
-        && std::env::var("NO_COLOR").is_err()
-        && std::io::stdout().is_terminal();
+    let color =
+        !cli.no_color && std::env::var("NO_COLOR").is_err() && std::io::stdout().is_terminal();
     let out = OutputConfig {
         format: cli.output,
         no_pager: cli.no_pager,
@@ -69,6 +77,28 @@ async fn main() -> Result<()> {
     };
 
     dispatch(cli.command, &client, &config, demo, &out).await
+}
+
+pub fn print_banner(color: bool) {
+    print_banner_to(color, false);
+}
+
+pub fn eprint_banner(color: bool) {
+    print_banner_to(color, true);
+}
+
+fn print_banner_to(color: bool, stderr: bool) {
+    if color {
+        if stderr {
+            eprint!("\x1b[32m{BANNER}\x1b[0m");
+        } else {
+            print!("\x1b[32m{BANNER}\x1b[0m");
+        }
+    } else if stderr {
+        eprint!("{BANNER}");
+    } else {
+        print!("{BANNER}");
+    }
 }
 
 pub async fn dispatch(

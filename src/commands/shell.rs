@@ -1,12 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
-use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 
 use crate::cli::{Cli, Command};
 use crate::client::KalshiClient;
 use crate::config::Config;
 use crate::dispatch;
+use crate::eprint_banner;
 use crate::output::OutputConfig;
 
 pub async fn execute(
@@ -19,6 +20,7 @@ pub async fn execute(
     let history_path = Config::config_dir().join("history.txt");
     let _ = rl.load_history(&history_path);
 
+    eprint_banner(out.color);
     eprintln!("Kalshi interactive shell. Type 'help' for commands, 'exit' to quit.");
 
     loop {
@@ -53,12 +55,16 @@ pub async fn execute(
                             continue;
                         }
                         // Config and completions don't make sense in the shell
-                        if matches!(cli.command, Command::Config { .. } | Command::Completions { .. })
-                        {
+                        if matches!(
+                            cli.command,
+                            Command::Config { .. } | Command::Completions { .. }
+                        ) {
                             eprintln!("This command is not available in shell mode.");
                             continue;
                         }
-                        if let Err(e) = Box::pin(dispatch(cli.command, client, config, demo, out)).await {
+                        if let Err(e) =
+                            Box::pin(dispatch(cli.command, client, config, demo, out)).await
+                        {
                             eprintln!("Error: {e}");
                         }
                     }
